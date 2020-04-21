@@ -6,7 +6,19 @@ All CSV files containing demographic/voter are pulled from state sites. Below ar
 
 All JSON files contain GIS polygon data, as well as their unique identifiers.
 
-# Notation
+# Replicating Results/Script Usage
+
+While it's possible without docker, it's recommended users use it.
+
+For an individual build (without using `docker-compose`, see [this script]() if you're interested in deploying the entire thing at once), perform the following stes:
+
+0. Check that the state you want to convert is available. You can customize the demographic/voting data by changing the `csv` file.
+1. Run `docker build . --tag bladecaller` in the same directory as the `Dockerfile` file.
+2. Run `docker run bladecaller <state>` where `<state>` is one of the options listed in the repo.
+3. The outputted `<state>.idx` and `<state>.json` will be saved as `data/output/<state>/<state>.idx` and `output/<state>/<state>.json` respectively.
+
+
+# Notation/File Format
 
 ## GIS Files
 As noted in the [US Census](https://www2.census.gov/geo/tiger/GENZ2018/2018_file_name_def.pdf), the following attributes are of paticular interest:
@@ -17,6 +29,11 @@ As noted in the [US Census](https://www2.census.gov/geo/tiger/GENZ2018/2018_file
 - `NAME`: A string representing the human readable name of the region
 - `ALAND`: An integer rerpesenting the area of land in the region
 - `AWATER`: An intenger representing the area of water in the region
+
+## CSV Files
+For demographic data, the information will be filled out as so:
+
+- `GEOID`: The US Census id of this precinct
 
 # State Files
 
