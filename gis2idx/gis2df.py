@@ -1,7 +1,7 @@
 """
 # Step 0: Convert GIS files from US Census to dataframe
 """
-
+import pickle
 import io
 import os
 import logging
@@ -52,9 +52,9 @@ def main():
     # Save to cache (and initialize if it wasn't done before)
     logging.debug(f"Creating Cache {state}")
     initializeCache()
-    with io.open(STEP_CACHE_LOCATION + f'{state}.df.a.csv', 'w') as handle:
-        payload = census_df.to_csv()
-        logging.debug(f"Writing {len(payload)} characters to {STEP_CACHE_LOCATION + f'{state}.df.a.csv'}")
+    with io.open(STEP_CACHE_LOCATION + f'{state}.df.a.pk', 'wb') as handle:
+        payload = pickle.dumps(census_df)
+        logging.debug(f"Writing {len(payload)} characters to {STEP_CACHE_LOCATION + f'{state}.df.a.pk'}")
         handle.write(payload)
 
     logging.debug(f"Completed {state}")
