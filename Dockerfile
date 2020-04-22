@@ -19,4 +19,5 @@ WORKDIR /app/
 
 RUN python3.7 -m pip install -r requirements.txt
 
-ENTRYPOINT [ "python gis2idx/" ]
+# For when the app actually works
+# ENTRYPOINT [ "python gis2idx/" ] 
