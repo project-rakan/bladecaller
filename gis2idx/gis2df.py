@@ -4,7 +4,6 @@
 
 import io
 import os
-import sys
 import logging
 import geopandas
 from typing import IO, Any
@@ -38,7 +37,7 @@ def main():
 
     # Get state
     logging.debug(f"Parsing state")
-    state = parseState(sys.argv)
+    state = parseState()
     logging.debug(f"Retrieved state {state}")
 
     # Check GIS files exist and get them

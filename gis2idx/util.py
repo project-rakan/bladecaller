@@ -2,6 +2,7 @@
 A set of utilities useful for this project.
 """
 import os
+import sys
 from typing import AnyStr, List
 
 from exceptions import (
@@ -32,9 +33,10 @@ def intToStrHex(integer: int, maxBytes: int = 4):
         raise ValueError(f"{integer} cannot be represented in {maxBytes} bytes")
     return "0" * ((2 * maxBytes) - len(str(strHex))) + str(strHex)
 
-def parseState(arguments: List[str]):
+def parseState():
     "Takes in a sys.argv command, extracts the state from it, and checks if it exists"
 
+    arguments = sys.argv
     if len(arguments) < 2:
         raise ValueError("No state specified")
 
