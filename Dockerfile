@@ -11,13 +11,12 @@ RUN apt-get update
 RUN apt-get install libgdal-dev gdal-bin -y
 RUN apt-get install python3.7 python3-pip -y
 
-# Copy repo code in
-COPY ./gis2idx /app/gis2idx
+# Copy repo requirements in and install them
 COPY ./requirements.txt /app/requirements.txt
-
 WORKDIR /app/
-
 RUN python3.7 -m pip install -r requirements.txt
+
+WORKDIR /home/project
 
 # For when the app actually works
 # ENTRYPOINT [ "python gis2idx/" ] 
