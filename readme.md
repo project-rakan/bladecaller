@@ -16,3 +16,7 @@ For an individual build (without using `docker-compose`, see [this script]() if 
 1. Run `docker build . --tag bladecaller` in the same directory as the `Dockerfile` file.
 2. Run `docker run bladecaller <state>` where `<state>` is one of the options listed in the repo.
 3. The outputted `<state>.idx` and `<state>.json` will be saved as `data/output/<state>/<state>.idx` and `output/<state>/<state>.json` respectively.
+
+## Workflow
+
+A recommended strategy is working from a docker container. Run the command: `docker run -it --volume "<absolute path to current directory>:/home/project" --rm ubuntu:latest`
