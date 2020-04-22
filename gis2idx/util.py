@@ -1,8 +1,14 @@
 """
 A set of utilities useful for this project.
 """
+import os
+from typing import AnyStr, List
 
-from typing import AnyStr
+from exceptions import (
+    DirectoryNotFoundError,
+    NoGISFilesFoundException,
+    NoCSVFilesFoundException
+)
 
 INPUT_PREFIX = 'data/'
 OUTPUT_PREFIX = 'output/'
@@ -25,3 +31,20 @@ def intToStrHex(integer: int, maxBytes: int = 4):
     if len(strHex) > (maxBytes * 2):
         raise ValueError(f"{integer} cannot be represented in {maxBytes} bytes")
     return "0" * ((2 * maxBytes) - len(str(strHex))) + str(strHex)
+
+def parseState(arguments: List[str]):
+    "Takes in a sys.argv command, extracts the state from it, and checks if it exists"
+
+    if len(arguments) < 2:
+        raise ValueError("No state specified")
+
+    # Check if the directory containing states exist/output directory exists
+    if not os.path.isdir(INPUT_PREFIX):
+        raise DirectoryNotFoundError(f"Unable to state input directory: '{INPUT_PREFIX}'")
+
+    state = arguments[1]
+
+    if not os.path.isdir(INPUT_PREFIX + state):
+        raise ValueError("State not found")
+
+    return state
