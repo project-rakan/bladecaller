@@ -2,4 +2,4 @@
 *.pyc
 .vscode/
 *.log
-.mypy_cache/
+*_cache/
