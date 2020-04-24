@@ -9,7 +9,8 @@ import logging
 
 from util import (
     parseState,
-    INPUT_CSV_LOCATION
+    INPUT_CSV_LOCATION,
+    LOGMODE
 )
 from gis2df import (
     STEP_CACHE_LOCATION
@@ -99,5 +100,5 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='df2cleandf.log', level=logging.DEBUG)
+    logging.basicConfig(filename='df2cleandf.log', level=logging.DEBUG, filemode=LOGMODE)
     main()

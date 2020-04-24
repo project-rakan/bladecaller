@@ -19,6 +19,7 @@ OUTPUT_IDX_LOCATION = OUTPUT_PREFIX + '{state}/{state}.idx'
 OUTPUT_JSON_LOCATION = OUTPUT_PREFIX + '{state}/{state}.json'
 CACHE_LOCATION = '.gis2idx_cache/'
 MAGIC_NUMBER = "BEEFCAFE"
+LOGMODE = 'a' #changing to 'w' will clear old logs
 
 def generateCSVTemplate(state_name: AnyStr):
     """
