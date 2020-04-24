@@ -45,7 +45,6 @@ def appendDemographicsData(state: str, df):
     demo = demo.rename(columns=dict(zip(colsToAdd, readableNames)))
 
     # Merge the demographic data with the main dataframe
-    
     # Match df's types
     demo = demo.astype(int)
     demo["GEOID"] = demo["GEOID"].astype(str)
@@ -53,13 +52,20 @@ def appendDemographicsData(state: str, df):
     # Merge the dataframes
     df = pd.merge(df, demo, on="GEOID", how="left")
 
-    dataLeftOut = len(list(set(demo["GEOID"]) - set(df["GEOID"])))
-    if dataLeftOut > 0:
-        logging.debug(f"Unable to merge data for {dataLeftOut} precincts")
+    # Check for missing data in the map data or demographic data
+    # Demographic data that can't be placed on a map
+    dataLeftOut = set(demo["GEOID"]) - set(df["GEOID"])
+    if len(dataLeftOut) > 0:
+        total = 0
+        for geo in dataLeftOut:
+            total += int(demo[demo["GEOID"] == list(dataLeftOut)[0]]["TotalPop"])
+        logging.debug(f"Unable to merge data for {dataLeftOut} precincts ({total} population)")
 
-    dataMissing = len(list(set(df["GEOID"]) - set(demo["GEOID"])))
-    if dataMissing > 0:
-        logging.debug(f"Unable to find data for {dataLeftOut} precincts")
+    # Map data without any demographic data
+    dataMissing = set(df["GEOID"]) - set(demo["GEOID"])
+    if len(dataMissing) > 0:
+        logging.debug(f"Unable to find data for {dataMissing} precincts")
+
 
     return df
     
@@ -90,7 +96,7 @@ def main():
     df = appendDemographicsData(state, df)
     logging.debug(f"Finished merge of demographic data")
 
-    
+
 
 if __name__ == "__main__":
     logging.basicConfig(filename='df2cleandf.log', level=logging.DEBUG)
