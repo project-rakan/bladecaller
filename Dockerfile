@@ -18,5 +18,7 @@ RUN python3.7 -m pip install -r requirements.txt
 
 WORKDIR /home/project
 
+RUN apt-get install wget unzip -y
+
 # For when the app actually works
 # ENTRYPOINT [ "python gis2idx/" ] 
