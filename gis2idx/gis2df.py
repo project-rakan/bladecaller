@@ -16,6 +16,7 @@ from exceptions import (
 from util import (
     INPUT_GIS_LOCATION,
     CACHE_LOCATION,
+    LOGMODE,
     parseState
 )
 
@@ -61,5 +62,5 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='gis2df.log', level=logging.DEBUG)
+    logging.basicConfig(filename='gis2df.log', level=logging.DEBUG, filemode=LOGMODE)
     main()

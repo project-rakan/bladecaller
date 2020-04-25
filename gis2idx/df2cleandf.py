@@ -1,19 +1,30 @@
 import pickle
 import io
+import os
 import pandas as pd
 import logging
 
 from util import (
     parseState,
-    INPUT_CSV_LOCATION
+    INPUT_CSV_LOCATION,
+    CACHE_LOCATION,
+    LOGMODE
 )
 from gis2df import (
-    STEP_CACHE_LOCATION
+    STEP_CACHE_LOCATION as GIS2DF_CACHE
 )
+
+STEP_CACHE_LOCATION = CACHE_LOCATION + "df2cleandf/"
+
+def initializeCache():
+    "Create the cache defined in util.py if it doesn't exist"
+    if not os.path.isdir(STEP_CACHE_LOCATION):
+        logging.debug(f"Creating {STEP_CACHE_LOCATION}")
+        os.mkdir(STEP_CACHE_LOCATION)
 
 def readLastArtifact(state: str):
     "Load the previous artifact into memory"
-    with io.open(STEP_CACHE_LOCATION + f'{state}.df.a.pk', 'rb') as handle:
+    with io.open(GIS2DF_CACHE + f'{state}.df.a.pk', 'rb') as handle:
         payload = pickle.loads(handle.read())
     return payload
 
@@ -42,8 +53,15 @@ def appendDemographicsData(state: str, df):
 
     # Merge the demographic data with the main dataframe
     # Match df's types
-    demo = demo.astype(int)
+    cols=[i for i in demo.columns if i not in ["GEOID"]]
+    for col in cols:
+        demo[col] = demo[col].astype(int)
     demo["GEOID"] = demo["GEOID"].astype(str)
+
+    # Some GEOID's that begin with 0 get shortened
+    # Re-add the leading 0 before merge
+    if len(demo["GEOID"][0]) == 10:
+        demo["GEOID"] = demo["GEOID"].map(lambda x: '0'+x)
 
     # Merge the dataframes
     df = pd.merge(df, demo, on="GEOID", how="left")
@@ -64,7 +82,7 @@ def appendDemographicsData(state: str, df):
 
 
     return df
-    
+
 
 def main():
     "Clean up the dataframes for the state, checking for edge cases that need to be handled"
@@ -80,11 +98,11 @@ def main():
 
 
     logging.debug(f"Checking for edge cases")
-    #flag any water-only precincts exist
+    # flag any water-only precincts exist
     waterOnly = sum(df["ALAND"] == 0)
     logging.debug(f"{state} has {waterOnly} water-only precincts")
         
-    #check for multipolygons
+    # check for multipolygons
     multiPoly = sum(df["geometry"].geom_type == 'MultiPolygon')
     logging.debug(f"{state} has {multiPoly} precincts represented with multipolygons")
 
@@ -92,8 +110,11 @@ def main():
     df = appendDemographicsData(state, df)
     logging.debug(f"Finished merge of demographic data")
 
+    # Save to cache
+    initializeCache()
+    df.to_csv(f".gis2idx_cache/df2cleandf/{state}.df.b.csv")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='df2cleandf.log', level=logging.DEBUG)
+    logging.basicConfig(filename='df2cleandf.log', level=logging.DEBUG, filemode=LOGMODE)
     main()
