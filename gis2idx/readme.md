@@ -3,6 +3,9 @@
 The idea behind the design of this tool, is to divide the pipeline into a series of steps, each consumes and produces intermediate artifacts. This allows for a pool of workers to complete whatever step needs to be done. The steps are described below.
 
 ## Step 0: Convert Shapefile to DataFrame
+```
+python gis2idx/gis2df.py <state>
+```
 - Consumes: 
     - GIS files (`.shx`, `.sha`, etc, files)
 - Produces: 
