@@ -1,10 +1,6 @@
 import pickle
 import io
 import pandas as pd
-import geopandas
-from geopandas import GeoDataFrame
-from shapely.geometry import Point
-import fiona
 import logging
 
 from util import (
