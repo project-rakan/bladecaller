@@ -3,5 +3,3 @@
 .vscode/
 *.log
 *_cache/
-data/*/
-!data/_*
