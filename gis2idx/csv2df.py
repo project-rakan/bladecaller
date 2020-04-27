@@ -28,8 +28,8 @@ def readLastArtifact(state: str):
         payload = pickle.loads(handle.read())
     return payload
 
-def appendDemographicsData(state: str, df):
-    demo = pd.read_csv(INPUT_CSV_LOCATION.format(state=state))
+def appendDemographicsData(state: str, shapes_df):
+    demographic_df = pd.read_csv(INPUT_CSV_LOCATION.format(state=state))
 
     # Add the relavent columns to the main dataframe (df)
     """
@@ -48,40 +48,42 @@ def appendDemographicsData(state: str, df):
     readableNames = ['GEOID', 'TotalPop', 'WhitePop', 'BlackPop', 'NativeAPop',
                     'AsianPop', 'PacIsPop', 'OtherPop', 'MultiPop']
 
-    demo = demo[colsToAdd] # Narrow down demographic data to the most relevant set
-    demo = demo.rename(columns=dict(zip(colsToAdd, readableNames)))
+    demographic_df = demographic_df[colsToAdd] # Narrow down demographic data to the most relevant set
+    demographic_df = demographic_df.rename(columns=dict(zip(colsToAdd, readableNames)))
 
     # Merge the demographic data with the main dataframe
     # Match df's types
-    cols=[i for i in demo.columns if i not in ["GEOID"]]
+    cols = [i for i in demographic_df.columns if i not in ["GEOID"]]
     for col in cols:
-        demo[col] = demo[col].astype(int)
-    demo["GEOID"] = demo["GEOID"].astype(str)
+        demographic_df[col] = demographic_df[col].astype(int)
+    demographic_df["GEOID"] = demographic_df["GEOID"].astype(str)
 
-    # Some GEOID's that begin with 0 get shortened
-    # Re-add the leading 0 before merge
-    if len(demo["GEOID"][0]) == 10:
-        demo["GEOID"] = demo["GEOID"].map(lambda x: '0'+x)
+    # # Some GEOID's that begin with 0 get shortened
+    # # Re-add the leading 0 before merge
+    # if len(demographic_df["GEOID"][0]) == 10:
+    #     demographic_df["GEOID"] = demographic_df["GEOID"].map(lambda x: '0'+x)
+
+    import pdb; pdb.set_trace()
 
     # Merge the dataframes
-    df = pd.merge(df, demo, on="GEOID", how="left")
+    shapes_df = pd.merge(shapes_df, demographic_df, on="GEOID", how="left")
 
     # Check for missing data in the map data or demographic data
     # Demographic data that can't be placed on a map
-    dataLeftOut = set(demo["GEOID"]) - set(df["GEOID"])
+    dataLeftOut = set(demographic_df["GEOID"]) - set(shapes_df["GEOID"])
     if len(dataLeftOut) > 0:
         total = 0
         for geo in dataLeftOut:
-            total += int(demo[demo["GEOID"] == list(dataLeftOut)[0]]["TotalPop"])
+            total += int(demographic_df[demographic_df["GEOID"] == list(dataLeftOut)[0]]["TotalPop"])
         logging.debug(f"Unable to merge data for {dataLeftOut} precincts ({total} population)")
 
     # Map data without any demographic data
-    dataMissing = set(df["GEOID"]) - set(demo["GEOID"])
+    dataMissing = set(shapes_df["GEOID"]) - set(demographic_df["GEOID"])
     if len(dataMissing) > 0:
         logging.debug(f"Unable to find data for {dataMissing} precincts")
 
 
-    return df
+    return shapes_df
 
 
 def main():
@@ -99,7 +101,7 @@ def main():
 
     logging.debug(f"Checking for edge cases")
     # flag any water-only precincts exist
-    waterOnly = sum(df["ALAND"] == 0)
+    waterOnly = sum(df["land"] == 0)
     logging.debug(f"{state} has {waterOnly} water-only precincts")
         
     # check for multipolygons
