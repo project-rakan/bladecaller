@@ -1,6 +1,5 @@
 import pickle
 import io
-import os
 import pandas as pd
 import logging
 import struct
@@ -9,16 +8,15 @@ from shapely.geometry import mapping
 from util import (
     # Constants
     CACHE_LOCATION,
-    LOGMODE,
     OUTPUT_IDX_LOCATION,
     OUTPUT_JSON_LOCATION,
+    LOGMODE,
 
     # Functions
     parseState
 )
 #TODO: get correct storage location,
 # confirm that artifact will be a pickle data dump
-
 MERGED_DF_INPUT = CACHE_LOCATION + 'gis2df/_{state}.df.a.pk'
 MAGIC_NUM = 12 #TODO
 
