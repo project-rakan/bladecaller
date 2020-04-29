@@ -1,10 +1,10 @@
 # Data Sources
 
-All GIS files are pulled from the [US Census website](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html). Since the website format and its contents changes quite frequently, the data sources are pulled here. Note these are the precincts shape files from **2018**.
+All GIS files are pulled from the [US Census website](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html). Since the website format and its contents changes quite frequently, the data sources are pulled here. Note these are the precincts shape files from **2018** Census Tract datasets.
 
-All CSV files containing demographic/voter are pulled from the [IRE Census Bulk Data Website](http://census.ire.org/data/bulkdata.html). Note the population comes from **2010**.
+All demographic related (non-voter) data are pulled from the [IRE Census Bulk Data Website](http://census.ire.org/data/bulkdata.html). Note the demographic data comes from the **2010** Census.
 
-All JSON files contain GIS polygon data, as well as their unique identifiers.
+All voter related data points are pulled from the [Harvard Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/NH5S2I). Note that the **2016 presidential election data** was used. Thus, the assumption that voters who voted for a president of one party, voted for congressional representatives of the same party.
 
 ## Automation Notes
 Due to the unreliability of the US Census website and it's ever changing nature, webscraping is difficult (which is why everything is posted here in the first place). At the time of this writing (April 2020), the following script was use to automatically download all GIS/CSV files for processing. The `stateKeys.csv` is left in the directory for future use. Note the `csv` file excludes states with only one district.
@@ -27,17 +27,30 @@ def main():
             print(f"Creating Directory for {state_name}")
             state_name = state_name.lower().replace(' ', '_')
             os.mkdir(f"{state_name}")
-            os.mkdir(f"{state_name}/gis")
         else:
             print(f"Directory already exists for {state_name}")
 
-        print(f"Downloading 2010 {state_name.title()} Census Data")
-        os.system(f"wget -O - http://censusdata.ire.org/{fips}/all_140_in_{fips}.P3.csv | gunzip > {state_name}/{state_name}.csv")
+        if not os.path.isfile(f"{state_name}/{state_name}.csv"):
+            print(f"Downloading 2010 {state_name.title()} Census Data")
+            os.system(f"wget -O - http://censusdata.ire.org/{fips}/all_140_in_{fips}.P3.csv | gunzip > {state_name}/{state_name}.csv")
 
-        print(f"Downloading 2018 {state_name.title()} shapefiles")
-        os.system(f"wget -O {state_name}/temp.zip https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_{fips}_tract_500k.zip")
-        os.system(f"unzip {state_name}/temp.zip -d {state_name}/gis/")
-        os.system(f"rm {state_name}/temp.zip")
+
+        if not os.path.isdir(f"{state_name}/vtd/"):
+            os.mkdir(f"{state_name}/vtd")
+            print(f"Downloading 2010 {state_name.title()} Census VTD shapefiles")
+            os.system(f"wget -O {state_name}/temp.zip https://www2.census.gov/geo/tiger/TIGER2012/VTD/tl_2012_{fips}_vtd10.zip")
+            os.system(f"unzip {state_name}/temp.zip -d {state_name}/vtd/")
+            os.system(f"rm {state_name}/temp.zip")
+
+        if not os.path.isdir(f"{state_name}/tracts/"):
+            os.mkdir(f"{state_name}/tracts")
+            print(f"Downloading 2018 {state_name.title()} Census Tract shapefiles")
+            os.system(f"wget -O {state_name}/temp.zip https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_{fips}_tract_500k.zip")
+            os.system(f"unzip {state_name}/temp.zip -d {state_name}/tracts/")
+            os.system(f"rm {state_name}/temp.zip")
+
+        if not os.path.isdir(f"{state_name}/votes"):
+            os.mkdir(f"{state_name}/votes")
 
 if __name__ == "__main__":
     main()
