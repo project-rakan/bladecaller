@@ -17,8 +17,8 @@ INPUT_GIS_LOCATION = INPUT_PREFIX + '{state}/gis/'
 INPUT_CSV_LOCATION = INPUT_PREFIX + '{state}/{state}.csv'
 OUTPUT_IDX_LOCATION = OUTPUT_PREFIX + '{state}/{state}.idx'
 OUTPUT_JSON_LOCATION = OUTPUT_PREFIX + '{state}/{state}.json'
-STATEPARSER_CACHE_LOCATION = CACHE_LOCATION + 'stateparser/'
 CACHE_LOCATION = '.gis2idx_cache/'
+STATEPARSER_CACHE_LOCATION = CACHE_LOCATION + 'stateparser/'
 MAGIC_NUMBER = 0xBEEFCAFE
 LOGMODE = 'a' #changing to 'w' will clear old logs
 
