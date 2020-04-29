@@ -19,7 +19,6 @@ from util import (
     parseState
 )
 # TODO: Get correct storage location,
-# TODO: Confirm that artifact will be a pickle data dump
 MERGED_DF_INPUT = CACHE_LOCATION + 'gis2df/{state}.df.a.pk'
 
 # .idx data formats
@@ -40,7 +39,7 @@ NODE_RECORD_F = ENDIAN + 'iii'
 NODE_ID_F = ENDIAN + 'q'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
                             # Must be a longlong(q) because GEOIDs >=10^10
 VERTEX_F = ENDIAN + 'dd'    # Different from diagram (original: 'ii', is 16B, was 8B)
-                            #Vertex coords must be double
+                            # Vertex coords must be double
 NEIGHBOR_F = NODE_ID_F
 DEMOGRAPHICS_F = ENDIAN + 'hhhhhh' # Different from diagram (original: 'iiiiii', is 12B, was 24B)
                             # Demographics differ from diagram
@@ -115,7 +114,7 @@ def calcNodeSize(numV, numN):
 
 def calcCheckSum():
     "Calculates a checksum to be included in the data header"
-    return 12 #TODO checksum
+    return 12 #TODO checksum MD5
 
 def toIdx(df, state: str):
     "Formats and outputs a .idx from the data in the dataframe"
@@ -141,7 +140,7 @@ def toIdx(df, state: str):
         # vertex #1 - vertex #n_3
         verticesPacked = getVertexStructList(coordLists[index])
 
-        # neighbor_id #1 - neighbor_id #n_4
+        # neighbor_id #1 - neighbor_id #n_4h
         neighbors = df.at[index, "NEIGHBORS"].split(", ")
         neighborsPacked = getNeighborStructList(neighbors)
 
