@@ -130,6 +130,10 @@ class State(object):
         "Drop the multi polygons"
         pass
 
+    def dissolveGranularity(self, level):
+        "Dissolve into counties, cities, etc"
+        pass
+
     def mergeTables(self):
         "Use PostGIS to merge all datasets into one df"
         # merge demographics + tracts
@@ -147,6 +151,7 @@ class State(object):
 
         # Drop multi-polygons here
         self.dropMultiPolygons()
+        self.dissolveGranularity("county") # Todo: change
 
         for column in [
             'center_y', 'center_x', 'vtdi', 'vtd', 'geoid', 'GEOID'
