@@ -19,7 +19,7 @@ from util import (
     parseState
 )
 # TODO: Get correct storage location,
-MERGED_DF_INPUT = CACHE_LOCATION + 'gis2df/{state}.df.a.pk'
+MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
 
 # .idx data formats
 """
@@ -48,7 +48,7 @@ DEMOGRAPHICS_F = ENDIAN + 'hhhhhh' # Different from diagram (original: 'iiiiii',
 def readLastArtifact(state: str):
     "Load the previous artifact into memory"
     with io.open(MERGED_DF_INPUT.format(state=state), 'rb') as handle:
-        payload = pickle.loads(handle.read())
+        payload = pickle.load(handle)
     return payload
 
 def initializeOutput(state):
