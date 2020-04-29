@@ -14,7 +14,7 @@ from gis2df import (
     STEP_CACHE_LOCATION as GIS2DF_CACHE
 )
 
-STEP_CACHE_LOCATION = CACHE_LOCATION + "df2cleandf/"
+STEP_CACHE_LOCATION = CACHE_LOCATION + "csv2df/"
 
 def initializeCache():
     "Create the cache defined in util.py if it doesn't exist"
@@ -58,12 +58,10 @@ def appendDemographicsData(state: str, shapes_df):
         demographic_df[col] = demographic_df[col].astype(int)
     demographic_df["GEOID"] = demographic_df["GEOID"].astype(str)
 
-    # # Some GEOID's that begin with 0 get shortened
-    # # Re-add the leading 0 before merge
-    # if len(demographic_df["GEOID"][0]) == 10:
-    #     demographic_df["GEOID"] = demographic_df["GEOID"].map(lambda x: '0'+x)
-
-    import pdb; pdb.set_trace()
+    # Some GEOID's that begin with 0 get shortened
+    # Re-add the leading 0 before merge
+    if len(demographic_df["GEOID"][0]) == 10:
+        demographic_df["GEOID"] = demographic_df["GEOID"].map(lambda x: '0'+x)
 
     # Merge the dataframes
     shapes_df = pd.merge(shapes_df, demographic_df, on="GEOID", how="left")
@@ -83,7 +81,7 @@ def appendDemographicsData(state: str, shapes_df):
         logging.debug(f"Unable to find data for {dataMissing} precincts")
 
 
-    return shapes_df
+    return demographic_df
 
 
 def main():
@@ -114,9 +112,9 @@ def main():
 
     # Save to cache
     initializeCache()
-    df.to_csv(f".gis2idx_cache/df2cleandf/{state}.df.b.csv")
+    df.to_csv(f"{STEP_CACHE_LOCATION}{state}.df.b.csv")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='df2cleandf.log', level=logging.DEBUG, filemode=LOGMODE)
+    logging.basicConfig(filename='csv2df.log', level=logging.DEBUG, filemode=LOGMODE)
     main()

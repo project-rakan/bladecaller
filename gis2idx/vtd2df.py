@@ -6,7 +6,6 @@ import io
 import os
 import logging
 import geopandas
-import pandas as pd
 from typing import IO, Any
 from geopandas.geodataframe import GeoDataFrame
 
@@ -25,7 +24,7 @@ STEP_CACHE_LOCATION = CACHE_LOCATION + 'gis2df/'
 
 HEADER_MAP = {
     # Convert/Delete columns to more human friendly messages
-    'GEOID10': 'geoid', # Voting district identifier from 2010
+    'GEOID10': 'GEOID', # Voting district identifier from 2010
     'VTDST10': 'vtd', # 2010 Census voting district code
     'STATEFP10': None, # 2010 Census state Federal Information Processing Standards (FIPS) code
     'COUNTYFP10': 'countyfp', # 2010 Census state Federal Information Processing Standards (FIPS) code
@@ -55,7 +54,7 @@ def initializeCache():
 
 def cleanColumns(raw_df):
     logging.debug("Cleaning up columns")
-    clean_df = pd.DataFrame()
+    clean_df = geopandas.geodataframe.GeoDataFrame()
     for (old_col, new_col) in HEADER_MAP.items():
         if new_col is not None:
             logging.debug(f"Renaming column {old_col} to {new_col}")
