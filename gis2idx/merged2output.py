@@ -1,40 +1,49 @@
 import pickle
 import io
+import struct
 import pandas as pd
 import logging
-import struct
+import os
 from shapely.geometry import mapping
 
 from util import (
     # Constants
     CACHE_LOCATION,
+    OUTPUT_PREFIX,
     OUTPUT_IDX_LOCATION,
     OUTPUT_JSON_LOCATION,
+    MAGIC_NUMBER,
     LOGMODE,
 
     # Functions
     parseState
 )
-#TODO: get correct storage location,
-# confirm that artifact will be a pickle data dump
-MERGED_DF_INPUT = CACHE_LOCATION + 'gis2df/_{state}.df.a.pk'
-MAGIC_NUM = 12 #TODO
+# TODO: Get correct storage location,
+# TODO: Confirm that artifact will be a pickle data dump
+MERGED_DF_INPUT = CACHE_LOCATION + 'gis2df/{state}.df.a.pk'
 
 # .idx data formats
 """
 Key:
-    h -> short  -> 2 bytes
-    i -> int    -> 4 bytes
-    l -> long   -> 8 bytes
-    d -> double -> 8 bytes
+    h ->    short       -> 2 bytes
+    i ->    int         -> 4 bytes
+    I ->    uint        -> 4 bytes
+    l ->    long        -> 4 or 8 bytes
+    q ->    long long   -> 8 bytes
+    d ->    double      -> 8 bytes
+    > ->    big endian
+    < ->    little endian
 """
-HEADER_F = 'iii'
-NODE_RECORD_F = 'iii'
-NODE_ID_F = 'l'
-VERTEX_F = 'dd'
+ENDIAN = '>'
+HEADER_F = ENDIAN + 'Iii'   # The first uint(I) is to preserve the MagicNumer's hex value
+NODE_RECORD_F = ENDIAN + 'iii'
+NODE_ID_F = ENDIAN + 'q'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
+                            # Must be a longlong(q) because GEOIDs >=10^10
+VERTEX_F = ENDIAN + 'dd'    # Different from diagram (original: 'ii', is 16B, was 8B)
+                            #Vertex coords must be double
 NEIGHBOR_F = NODE_ID_F
-DEMOGRAPHICS_F = 'hhhhhh'
-
+DEMOGRAPHICS_F = ENDIAN + 'hhhhhh' # Different from diagram (original: 'iiiiii', is 12B, was 24B)
+                            # Demographics differ from diagram
 
 
 def readLastArtifact(state: str):
@@ -43,6 +52,18 @@ def readLastArtifact(state: str):
         payload = pickle.loads(handle.read())
     return payload
 
+def initializeOutput(state):
+    "Create the output directory defined in util.py if it doesn't exist"
+
+    logging.debug("Initializing Output")
+    if not os.path.isdir(OUTPUT_PREFIX):
+        logging.debug(f"Creating {OUTPUT_PREFIX}")
+        os.mkdir(OUTPUT_PREFIX)
+    
+    outloc = OUTPUT_PREFIX + f"{state}/"
+    if not os.path.isdir(outloc):
+        logging.debug(f"Creating {outloc}")
+        os.mkdir(outloc)
 
 def getNeighbors(df):
     "Creates a new column 'NEIGHBORS' that stores a list of neighbors for each precinct"
@@ -74,7 +95,7 @@ def getNeighborStructList(neighborsList):
 
 def packDemograpchics(prec):
     "Returns a byte structs that each contains the demographic data for the precinct"
-    #TODO added Totalpop, missing HispanicPop
+    #TODO Missing HispanicPop, added TotalPop
     #['TotalPop', 'BlackPop', 'NativeAPop', 'AsianPop', 'WhitePop', 'OtherPop']
     return struct.pack(DEMOGRAPHICS_F, prec['TotalPop'],
                                         prec['BlackPop'],
@@ -94,7 +115,7 @@ def calcNodeSize(numV, numN):
 
 def calcCheckSum():
     "Calculates a checksum to be included in the data header"
-    return 12 #TODO
+    return 12 #TODO checksum
 
 def toIdx(df, state: str):
     "Formats and outputs a .idx from the data in the dataframe"
@@ -104,7 +125,12 @@ def toIdx(df, state: str):
     # Convert each precinct's POLYGON into a list of (x,y) coordinates
     coordLists = getPolyCoords(df.geometry)
 
+    # Used to store records for printing later
+    nodeRecords = []
+    nodes = []
+
     # To keep track of position of node records, cumulative length of previous records
+    # TODO: Confirm that nodePos is not from start of file, but start of node data
     nodePos = 0
 
     for index, precinct in df.iterrows():
@@ -120,7 +146,7 @@ def toIdx(df, state: str):
         neighborsPacked = getNeighborStructList(neighbors)
 
         # demographics
-        #demoPacked = packDemograpchics(precinct)
+        #demoPacked = packDemograpchics(precinct) #TODO: uncomment once demographic data works
 
         #data for node_record #[index]
         numVertices = len(coordLists[index])
@@ -129,25 +155,31 @@ def toIdx(df, state: str):
         # Create Node Record
         nodeRecord = struct.pack(NODE_RECORD_F, numVertices, numNeighbors, nodePos)
 
+        # Store packed data for later printing
+        nodeRecords.append(nodeRecord)
+        node = [nodeID] + verticesPacked + neighborsPacked #TODO + demoPacked
+        nodes.append(node)
+
         # recalculate nodePos for next record
         nodePos = nodePos + calcNodeSize(numVertices, numNeighbors)
-
-        # TODO store / print / pass to stream the Packed data:
-        # nodeRecord,
-        # nodeID, 
-        # verticesPacked, 
-        # neighborsPacked, 
-        # demoPacked
-        import pdb; pdb.set_trace()
+        #END OF FORLOOP
 
     # Create State Header
-    magicNumber = MAGIC_NUM
     checkSum = calcCheckSum()
     numNodes = len(df)
-    header = struct.pack(HEADER_F, magicNumber, checksum, num_nodes)
+    header = struct.pack(HEADER_F, MAGIC_NUMBER, checkSum, numNodes)
 
-    # TODO store / print / pass to stream the Packed data:
-    # header
+    # Output Struct Byte data to idx file
+    fout = open(OUTPUT_IDX_LOCATION.format(state=state), 'wb')
+    total = 0
+    total += fout.write(header)
+    for record in nodeRecords:
+        total += fout.write(record)
+    for node in nodes:
+        for data in node:
+            total += fout.write(data)
+    return total
+    
 
 def main():
     "Creates the output .idx and json files from the cleaned and merged dataframe"
@@ -161,7 +193,13 @@ def main():
     df = readLastArtifact(state)
     logging.debug(f"Successfully loaded artifact")
 
-    toIdx(df, state)
+    #initialize output directory
+    initializeOutput(state)
+
+    # Output to .idx file
+    logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
+    written = toIdx(df, state)
+    logging.debug(f"Finished writing {written} bytes to .idx file")
 
 
 if __name__ == "__main__":
