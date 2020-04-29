@@ -34,7 +34,6 @@ class State(object):
         if loadFromCache:
             self.load()
        
-
     def loadVtd(self):
         "Load the VTD data into this state"
         df = geopd.read_file(VTD_LOCATION.format(state=self._state))
@@ -57,7 +56,7 @@ class State(object):
             'ALAND10': 'land', # 2010 Census land area (square meters),
             'AWATER10': 'water', # 2010 Census water area (square meters),
             'INTPTLAT10': 'center_y', # Lattitude of precinct
-            'INTPTLON10': 'centery_x', # Longitude of precinct
+            'INTPTLON10': 'center_x', # Longitude of precinct
             'geometry': 'geometry', # Shape Details of VTD
         }, inplace=True)
 
@@ -127,6 +126,10 @@ class State(object):
         "Load the voter data into this state"
         pass
 
+    def dropMultiPolygons(self):
+        "Drop the multi polygons"
+        pass
+
     def mergeTables(self):
         "Use PostGIS to merge all datasets into one df"
         # merge demographics + tracts
@@ -139,6 +142,18 @@ class State(object):
             census_df = pickle.load(handle)
     
         self._demographic_df = pd.merge(census_df, self._vtd_df, right_on='GEOID', left_on='geoid', how='left')
+
+        import pdb; pdb.set_trace()
+
+        # Drop multi-polygons here
+        self.dropMultiPolygons()
+
+        for column in [
+            'center_y', 'center_x', 'vtdi', 'vtd', 'geoid', 'GEOID'
+        ]:
+            del self._demographic_df[column]
+        
+        
 
         self.save()
 

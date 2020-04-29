@@ -92,8 +92,10 @@ class Command(BaseCommand):
             table['multiPop'].append(0)
 
             for related_tract in related_tracts:
+                # this calculates interesection area
                 overlap = -vtdblock.geometry.union(related_tract.geometry).area + vtdblock.geometry.area + related_tract.geometry.area
                 partition = (overlap / related_tract.geometry.area)
+
                 table['totalPop'][-1] += partition * related_tract.totalPop
                 table['whitePop'][-1] += partition * related_tract.whitePop
                 table['blackPop'][-1] += partition * related_tract.blackPop
