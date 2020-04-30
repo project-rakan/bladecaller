@@ -12,6 +12,7 @@ from util import (
     CACHE_LOCATION,
     INPUT_PREFIX,
     CACHE_LOCATION,
+    STATEPARSER_CACHE_LOCATION,
     parseState
 )
 
@@ -19,8 +20,6 @@ VTD_LOCATION = INPUT_PREFIX + '{state}/vtd/'
 TRACTS_LOCATION = INPUT_PREFIX + '{state}/tracts/'
 VOTES_LOCATION = INPUT_PREFIX + '{state}/votes/'
 DEMOGRAPHIC_LOCATION = INPUT_PREFIX + '{state}/{state}.csv'
-
-STEP_CACHE_LOCATION = CACHE_LOCATION + 'stateparser/'
 
 class State(object):
 
@@ -153,8 +152,8 @@ class State(object):
         "Use PostGIS to merge all datasets into one df"
         # merge demographics + tracts
         self.save()
-        abs_path = os.path.abspath(STEP_CACHE_LOCATION + self._state + '.state.pk')
-        output_path = os.path.abspath(STEP_CACHE_LOCATION + self._state + '.demographics.pk')
+        abs_path = os.path.abspath(STATEPARSER_CACHE_LOCATION + self._state + '.state.pk')
+        output_path = os.path.abspath(STATEPARSER_CACHE_LOCATION + self._state + '.demographics.pk')
         os.system(f"cd gis2idx/datamerger && python3.7 manage.py parse_census_df \"{abs_path}\" \"{output_path}\"")
         
         with io.open(output_path, 'rb') as handle:
@@ -180,14 +179,14 @@ class State(object):
     def save(self):
         "Cache to a pickle"
         initializeCache()
-        with io.open(STEP_CACHE_LOCATION + self._state + '.state.pk', 'wb') as handle:
+        with io.open(STATEPARSER_CACHE_LOCATION + self._state + '.state.pk', 'wb') as handle:
             pickle.dump(self._demographic_df, handle)
             pickle.dump(self._vtd_df, handle)
             pickle.dump(self._tract_df, handle)
 
     def load(self):
         "Load from pickle"
-        with io.open(STEP_CACHE_LOCATION + self._state + '.state.pk', 'rb') as handle:
+        with io.open(STATEPARSER_CACHE_LOCATION + self._state + '.state.pk', 'rb') as handle:
             self._demographic_df = pickle.load(handle)
             self._vtd_df = pickle.load(handle)
             self._tract_df = pickle.load(handle)
@@ -202,9 +201,9 @@ def initializeCache():
     if not os.path.isdir(CACHE_LOCATION):
         logging.debug(f"Creating {CACHE_LOCATION}")
         os.mkdir(CACHE_LOCATION)
-    if not os.path.isdir(STEP_CACHE_LOCATION):
-        logging.debug(f"Creating {STEP_CACHE_LOCATION}")
-        os.mkdir(STEP_CACHE_LOCATION)
+    if not os.path.isdir(STATEPARSER_CACHE_LOCATION):
+        logging.debug(f"Creating {STATEPARSER_CACHE_LOCATION}")
+        os.mkdir(STATEPARSER_CACHE_LOCATION)
 
 def main():
     state = parseState()
@@ -214,6 +213,7 @@ def main():
     stateHandle.loadDemographics()
     stateHandle.loadVotes()
     stateHandle.mergeTables(sys.argv[2] if len(sys.argv) >= 3 else None)
+
 
 if __name__ == "__main__":
     logging.basicConfig(filename='stateparser.log', level=logging.DEBUG)
