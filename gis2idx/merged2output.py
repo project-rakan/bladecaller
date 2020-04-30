@@ -34,14 +34,14 @@ Key:
     < ->    little endian
 """
 ENDIAN = '>'
-HEADER_F = ENDIAN + 'Iii'   # The first uint(I) is to preserve the MagicNumer's hex value
+HEADER_F = ENDIAN + 'IIi'   # The first uint(I) is to preserve the MagicNumer's hex value
 NODE_RECORD_F = ENDIAN + 'iii'
 NODE_ID_F = ENDIAN + 'i'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
                             # Must be a longlong(q) because GEOIDs >=10^10
 VERTEX_F = ENDIAN + 'dd'    # Different from diagram (original: 'ii', is 16B, was 8B)
                             # Vertex coords must be double
 NEIGHBOR_F = NODE_ID_F
-DEMOGRAPHICS_F = ENDIAN + 'hhhhhh' # Different from diagram (original: 'iiiiii', is 12B, was 24B)
+DEMOGRAPHICS_F = ENDIAN + 'iiiiii' # Different from diagram (original: 'iiiiii', is 12B, was 24B)
                             # Demographics differ from diagram
 
 
@@ -67,16 +67,16 @@ def initializeOutput(state):
 def getNeighbors(df):
     "Creates a new column 'NEIGHBORS' that stores a list of neighbors for each precinct"
     geo = df.geometry.tolist()
+    
+    neighbors = [[] for i in range(len(geo))]
+    for i in range(len(geo)):
+        for j in range(i):
+            if geo[i].touches(geo[j]):
+                neighbors[i].append(str(j))
+                neighbors[j].append(str(i))
+    for i in range(len(geo)):
+        df.at[i, "NEIGHBORS"] = ", ".join(neighbors[i])
 
-    for index in range(len(geo)):
-        thisGeo = geo[index]
-        neighbors=[]
-        for i2 in range(len(geo)):
-            if index == i2:
-                continue
-            if geo[i2].touches(thisGeo):
-                neighbors.append(str(i2))
-        df.at[index, "NEIGHBORS"] = ", ".join(neighbors)     
     return df
 
 def getPolyCoords(geo):
@@ -90,26 +90,28 @@ def getVertexStructList(vertList):
     "Returns a list of byte structs that each contain a coordinate (x,y)"
     vertices = []
     for v in vertList:
-        vertices.append(struct.pack(VERTEX_F, v[0], v[1]))
+        vertices.append(struct.pack(VERTEX_F, float(v[0]), float(v[1])))
     return vertices
 
 def getNeighborStructList(neighborsList):
     "Returns a list of byte structs that each contain a neighbor GEOID"
     neighbors = []
     for n in neighborsList:
-        neighbors.append(struct.pack(NEIGHBOR_F, int(n)))
+        if len(n) > 0:
+            neighbors.append(struct.pack(NEIGHBOR_F, int(n)))
     return neighbors
 
 def packDemograpchics(prec):
     "Returns a byte structs that each contains the demographic data for the precinct"
     #TODO Missing HispanicPop, added TotalPop
     #['TotalPop', 'BlackPop', 'NativeAPop', 'AsianPop', 'WhitePop', 'OtherPop']
-    return struct.pack(DEMOGRAPHICS_F, prec['TotalPop'],
-                                        prec['BlackPop'],
-                                        prec['NativeAPop'],
-                                        prec['AsianPop'],
-                                        prec['WhitePop'],
-                                        prec['OtherPop'])
+    otherpop = prec['otherPop'] + prec['pacisPop'] + prec['multiPop']
+    return struct.pack(DEMOGRAPHICS_F, int(prec['totalPop']),
+                                        int(prec['blackPop']),
+                                        int(prec['nativeAPop']),
+                                        int(prec['asianPop']),
+                                        int(prec['whitePop']),
+                                        int(otherpop))
 
 def calcNodeSize(numV, numN):
     "Returns the size of the node record in bytes"
@@ -122,7 +124,7 @@ def calcNodeSize(numV, numN):
 
 def calcCheckSum():
     "Calculates a checksum to be included in the data header"
-    return 12 #TODO checksum MD5
+    return 0xABBAABBA #TODO checksum MD5
 
 def toIdx(df, state: str):
     "Formats and outputs a .idx from the data in the dataframe"
@@ -137,7 +139,6 @@ def toIdx(df, state: str):
     nodes = []
 
     # To keep track of position of node records, cumulative length of previous records
-    # TODO: Confirm that nodePos is not from start of file, but start of node data
     nodePos = 0
 
     for index, precinct in df.iterrows():
@@ -153,7 +154,7 @@ def toIdx(df, state: str):
         neighborsPacked = getNeighborStructList(neighbors)
 
         # demographics
-        #demoPacked = packDemograpchics(precinct) #TODO: uncomment once demographic data works
+        demoPacked = packDemograpchics(precinct) #TODO: uncomment once demographic data works
 
         #data for node_record #[index]
         numVertices = len(coordLists[index])
