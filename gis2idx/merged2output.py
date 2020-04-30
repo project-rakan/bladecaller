@@ -8,7 +8,7 @@ from shapely.geometry import mapping
 
 from util import (
     # Constants
-    CACHE_LOCATION,
+    STATEPARSER_CACHE_LOCATION,
     OUTPUT_PREFIX,
     OUTPUT_IDX_LOCATION,
     OUTPUT_JSON_LOCATION,
@@ -19,8 +19,7 @@ from util import (
     parseState
 )
 # TODO: Get correct storage location,
-# TODO: Confirm that artifact will be a pickle data dump
-MERGED_DF_INPUT = CACHE_LOCATION + 'gis2df/{state}.df.a.pk'
+MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
 
 # .idx data formats
 """
@@ -37,10 +36,10 @@ Key:
 ENDIAN = '>'
 HEADER_F = ENDIAN + 'Iii'   # The first uint(I) is to preserve the MagicNumer's hex value
 NODE_RECORD_F = ENDIAN + 'iii'
-NODE_ID_F = ENDIAN + 'q'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
+NODE_ID_F = ENDIAN + 'i'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
                             # Must be a longlong(q) because GEOIDs >=10^10
 VERTEX_F = ENDIAN + 'dd'    # Different from diagram (original: 'ii', is 16B, was 8B)
-                            #Vertex coords must be double
+                            # Vertex coords must be double
 NEIGHBOR_F = NODE_ID_F
 DEMOGRAPHICS_F = ENDIAN + 'hhhhhh' # Different from diagram (original: 'iiiiii', is 12B, was 24B)
                             # Demographics differ from diagram
@@ -49,7 +48,7 @@ DEMOGRAPHICS_F = ENDIAN + 'hhhhhh' # Different from diagram (original: 'iiiiii',
 def readLastArtifact(state: str):
     "Load the previous artifact into memory"
     with io.open(MERGED_DF_INPUT.format(state=state), 'rb') as handle:
-        payload = pickle.loads(handle.read())
+        payload = pickle.load(handle)
     return payload
 
 def initializeOutput(state):
@@ -67,8 +66,16 @@ def initializeOutput(state):
 
 def getNeighbors(df):
     "Creates a new column 'NEIGHBORS' that stores a list of neighbors for each precinct"
-    for index, row in df.iterrows():  
-        neighbors = df[df.geometry.touches(row['geometry'])].GEOID.tolist()
+    geo = df.geometry.tolist()
+
+    for index in range(len(geo)):
+        thisGeo = geo[index]
+        neighbors=[]
+        for i2 in range(len(geo)):
+            if index == i2:
+                continue
+            if geo[i2].touches(thisGeo):
+                neighbors.append(str(i2))
         df.at[index, "NEIGHBORS"] = ", ".join(neighbors)     
     return df
 
@@ -115,7 +122,7 @@ def calcNodeSize(numV, numN):
 
 def calcCheckSum():
     "Calculates a checksum to be included in the data header"
-    return 12 #TODO checksum
+    return 12 #TODO checksum MD5
 
 def toIdx(df, state: str):
     "Formats and outputs a .idx from the data in the dataframe"
@@ -136,12 +143,12 @@ def toIdx(df, state: str):
     for index, precinct in df.iterrows():
         # Pack node #[index]'s data
         # node_id
-        nodeID = struct.pack(NODE_ID_F, int(precinct.GEOID))
+        nodeID = struct.pack(NODE_ID_F, int(index))
 
         # vertex #1 - vertex #n_3
         verticesPacked = getVertexStructList(coordLists[index])
 
-        # neighbor_id #1 - neighbor_id #n_4
+        # neighbor_id #1 - neighbor_id #n_4h
         neighbors = df.at[index, "NEIGHBORS"].split(", ")
         neighborsPacked = getNeighborStructList(neighbors)
 
