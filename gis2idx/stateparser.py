@@ -126,9 +126,18 @@ class State(object):
         "Load the voter data into this state"
         pass
 
+    def dropWater(self):
+        "Drop all rows where land area = 0"
+        self._demographic_df = self._demographic_df[self._demographic_df['land'] != 0].reset_index(drop=True)
+
     def dropMultiPolygons(self):
         "Drop the multi polygons"
-        pass
+        multiPolygonIndexes = self._demographic_df['geometry'].map(lambda row: row.type != 'Polygon')
+        for index, multiPolygonRow in self._demographic_df[multiPolygonIndexes].iterrows():
+            largestPolygon = sorted(multiPolygonRow['geometry'], key=lambda _: -_.area)[0]
+            self._demographic_df.loc[index, 'geometry'] = largestPolygon
+
+        import pdb; pdb.set_trace()
 
     def dissolveGranularity(self, level):
         "Dissolve into counties, cities, etc"
@@ -147,9 +156,10 @@ class State(object):
     
         self._demographic_df = pd.merge(census_df, self._vtd_df, right_on='GEOID', left_on='geoid', how='left')
 
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
         # Drop multi-polygons here
+        self.dropWater()
         self.dropMultiPolygons()
         self.dissolveGranularity("county") # Todo: change
 
