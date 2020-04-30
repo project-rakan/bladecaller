@@ -67,16 +67,16 @@ def initializeOutput(state):
 def getNeighbors(df):
     "Creates a new column 'NEIGHBORS' that stores a list of neighbors for each precinct"
     geo = df.geometry.tolist()
+    
+    neighbors = [[] for i in range(len(geo))]
+    for i in range(len(geo)):
+        for j in range(i):
+            if geo[i].touches(geo[j]):
+                neighbors[i].append(str(j))
+                neighbors[j].append(str(i))
+    for i in range(len(geo)):
+        df.at[i, "NEIGHBORS"] = ", ".join(neighbors[i])
 
-    for index in range(len(geo)):
-        thisGeo = geo[index]
-        neighbors=[]
-        for i2 in range(len(geo)):
-            if index == i2:
-                continue
-            if geo[i2].touches(thisGeo):
-                neighbors.append(str(i2))
-        df.at[index, "NEIGHBORS"] = ", ".join(neighbors)     
     return df
 
 def getPolyCoords(geo):
@@ -90,7 +90,7 @@ def getVertexStructList(vertList):
     "Returns a list of byte structs that each contain a coordinate (x,y)"
     vertices = []
     for v in vertList:
-        vertices.append(struct.pack(VERTEX_F, v[0], v[1]))
+        vertices.append(struct.pack(VERTEX_F, float(v[0]), float(v[1])))
     return vertices
 
 def getNeighborStructList(neighborsList):
@@ -104,12 +104,12 @@ def packDemograpchics(prec):
     "Returns a byte structs that each contains the demographic data for the precinct"
     #TODO Missing HispanicPop, added TotalPop
     #['TotalPop', 'BlackPop', 'NativeAPop', 'AsianPop', 'WhitePop', 'OtherPop']
-    return struct.pack(DEMOGRAPHICS_F, prec['TotalPop'],
-                                        prec['BlackPop'],
-                                        prec['NativeAPop'],
-                                        prec['AsianPop'],
-                                        prec['WhitePop'],
-                                        prec['OtherPop'])
+    return struct.pack(DEMOGRAPHICS_F, int(prec['TotalPop']),
+                                        int(prec['BlackPop']),
+                                        int(prec['NativeAPop']),
+                                        int(prec['AsianPop']),
+                                        int(prec['WhitePop']),
+                                        int(prec['OtherPop']))
 
 def calcNodeSize(numV, numN):
     "Returns the size of the node record in bytes"
