@@ -2,7 +2,7 @@ import io
 import os
 import logging
 
-import geopandas as geopd
+import geopandas as gpd
 import pandas as pd
 
 import pickle
@@ -36,7 +36,7 @@ class State(object):
        
     def loadVtd(self):
         "Load the VTD data into this state"
-        df = geopd.read_file(VTD_LOCATION.format(state=self._state))
+        df = gpd.read_file(VTD_LOCATION.format(state=self._state))
         for col2del in [
             'STATEFP10', # 2010 Census state Federal Information Processing Standards (FIPS) code
             'NAME10', # 2010 Census voting district name (numerical)
@@ -64,7 +64,7 @@ class State(object):
         
     def loadTracts(self):
         "Load Census Tracts into this state"
-        df = geopd.read_file(TRACTS_LOCATION.format(state=self._state))
+        df = gpd.read_file(TRACTS_LOCATION.format(state=self._state))
 
         for col2del in [
             'STATEFP', # 2010 Census state Federal Information Processing Standards (FIPS) code
@@ -137,13 +137,19 @@ class State(object):
             largestPolygon = sorted(multiPolygonRow['geometry'], key=lambda _: -_.area)[0]
             self._demographic_df.loc[index, 'geometry'] = largestPolygon
 
-        import pdb; pdb.set_trace()
-
     def dissolveGranularity(self, level):
         "Dissolve into counties, cities, etc"
-        pass
+        if level == 'county':
+            geometries = gpd.GeoDataFrame(self._demographic_df).dissolve('countyfp')
+            self._demographic_df = self._demographic_df.groupby('countyfp').agg(sum)
+            self._demographic_df['geometry'] = geometries['geometry']
+            self._demographic_df = self._demographic_df.reset_index()
+            self.dropMultiPolygons()
+        elif level is not None:
+            raise ValueError("Unknown level")
 
-    def mergeTables(self):
+
+    def mergeTables(self, dissolvePattern: str = None):
         "Use PostGIS to merge all datasets into one df"
         # merge demographics + tracts
         self.save()
@@ -155,13 +161,12 @@ class State(object):
             census_df = pickle.load(handle)
     
         self._demographic_df = pd.merge(census_df, self._vtd_df, right_on='GEOID', left_on='geoid', how='left')
-
-        # import pdb; pdb.set_trace()
+        self._demographic_df = gpd.GeoDataFrame(self._demographic_df)
 
         # Drop multi-polygons here
         self.dropWater()
         self.dropMultiPolygons()
-        self.dissolveGranularity("county") # Todo: change
+        self.dissolveGranularity(dissolvePattern)
 
         for column in [
             'center_y', 'center_x', 'vtdi', 'vtd', 'geoid', 'GEOID'
@@ -208,7 +213,7 @@ def main():
     stateHandle.loadTracts()
     stateHandle.loadDemographics()
     stateHandle.loadVotes()
-    stateHandle.mergeTables()
+    stateHandle.mergeTables(sys.argv[2] if len(sys.argv) >= 3 else None)
 
 if __name__ == "__main__":
     logging.basicConfig(filename='stateparser.log', level=logging.DEBUG)
