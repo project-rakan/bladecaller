@@ -1,9 +1,11 @@
 import pickle
 import io
+import json
 import struct
 import pandas as pd
 import logging
 import os
+import sys
 from shapely.geometry import mapping
 
 from util import (
@@ -126,13 +128,10 @@ def calcCheckSum():
     "Calculates a checksum to be included in the data header"
     return 0xABBAABBA #TODO checksum MD5
 
-def toIdx(df, state: str):
+def toIdx(df, state: str, coordsList):
     "Formats and outputs a .idx from the data in the dataframe"
     # Add lists of neighbors for each precinct to the dataframe
     df = getNeighbors(df)
-
-    # Convert each precinct's POLYGON into a list of (x,y) coordinates
-    coordLists = getPolyCoords(df.geometry)
 
     # Used to store records for printing later
     nodeRecords = []
@@ -187,9 +186,53 @@ def toIdx(df, state: str):
         for data in node:
             total += fout.write(data)
     return total
-    
 
-def main():
+def toJSON(df, state, coordLists):
+    stateName = state[:1].upper() + state[1:]
+
+    maxDistricts = 4 
+    fips = 1
+    if stateName == 'Iowa':# TODO: hardcoded max districts for Iowa/Washingon
+        maxDistricts = 4
+        fips = 19
+    elif stateName == 'Washington':
+        maxDistricts = 7 
+        fips = 53
+    # fips = df.geoid[0][:2] #TODO
+
+    precincts = []
+    for index, prec in df.iterrows():
+        precName = prec.name
+        precID = index
+        vertices = []
+        for v in coordLists[index]:
+            coord = {
+                "lat": float(v[0]),
+                "lng": float(v[1])
+            }
+            vertices.append(coord)
+        districtID = 0 #TODO: Hard coded 0 for missing district IDs
+
+        precinctEntry = {
+            "name": precName,
+            "id": precID,
+            "vertices": vertices,
+            "district": districtID
+        }
+        precincts.append(precinctEntry)
+
+    dictionary = {
+        "state": stateName,
+        "maxDistricts": maxDistricts,
+        "fips": fips,
+        "precincts": precincts
+    }
+
+    with open(OUTPUT_JSON_LOCATION.format(state=state), "w") as outfile:
+        outfile.write(json.dumps(dictionary, indent = 4))
+        
+    
+def main(arg):
     "Creates the output .idx and json files from the cleaned and merged dataframe"
     # Get state
     logging.debug(f"Parsing state")
@@ -204,13 +247,23 @@ def main():
     #initialize output directory
     initializeOutput(state)
 
+    # Convert each precinct's POLYGON into a list of (x,y) coordinates
+    coordLists = getPolyCoords(df.geometry)
+
     # Output to .idx file
-    logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
-    written = toIdx(df, state)
-    logging.debug(f"Finished writing {written} bytes to .idx file")
+    if(arg == None or arg == '-idx'):
+        logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
+        written = toIdx(df, state, coordLists)
+        logging.debug(f"Finished writing {written} bytes to .idx file")
+
+    # Output to .JSON file
+    if (arg == None or arg == '-json'):
+        logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
+        toJSON(df, state, coordLists)
+        logging.debug(f"Finished writing to .JSON file")
 
 
 if __name__ == "__main__":
     logging.basicConfig(filename='merged2output.log', level=logging.DEBUG, filemode=LOGMODE)
-    main()
+    main(sys.argv[2] if len(sys.argv) >= 3 else None)
 
