@@ -8,7 +8,7 @@ from shapely.geometry import mapping
 
 from util import (
     # Constants
-    CACHE_LOCATION,
+    STATEPARSER_CACHE_LOCATION,
     OUTPUT_PREFIX,
     OUTPUT_IDX_LOCATION,
     OUTPUT_JSON_LOCATION,
@@ -36,7 +36,7 @@ Key:
 ENDIAN = '>'
 HEADER_F = ENDIAN + 'Iii'   # The first uint(I) is to preserve the MagicNumer's hex value
 NODE_RECORD_F = ENDIAN + 'iii'
-NODE_ID_F = ENDIAN + 'q'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
+NODE_ID_F = ENDIAN + 'i'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
                             # Must be a longlong(q) because GEOIDs >=10^10
 VERTEX_F = ENDIAN + 'dd'    # Different from diagram (original: 'ii', is 16B, was 8B)
                             # Vertex coords must be double
@@ -66,8 +66,16 @@ def initializeOutput(state):
 
 def getNeighbors(df):
     "Creates a new column 'NEIGHBORS' that stores a list of neighbors for each precinct"
-    for index, row in df.iterrows():  
-        neighbors = df[df.geometry.touches(row['geometry'])].GEOID.tolist()
+    geo = df.geometry.tolist()
+
+    for index in range(len(geo)):
+        thisGeo = geo[index]
+        neighbors=[]
+        for i2 in range(len(geo)):
+            if index == i2:
+                continue
+            if geo[i2].touches(thisGeo):
+                neighbors.append(str(i2))
         df.at[index, "NEIGHBORS"] = ", ".join(neighbors)     
     return df
 
@@ -135,7 +143,7 @@ def toIdx(df, state: str):
     for index, precinct in df.iterrows():
         # Pack node #[index]'s data
         # node_id
-        nodeID = struct.pack(NODE_ID_F, int(precinct.GEOID))
+        nodeID = struct.pack(NODE_ID_F, int(index))
 
         # vertex #1 - vertex #n_3
         verticesPacked = getVertexStructList(coordLists[index])
