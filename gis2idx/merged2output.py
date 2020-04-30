@@ -97,7 +97,8 @@ def getNeighborStructList(neighborsList):
     "Returns a list of byte structs that each contain a neighbor GEOID"
     neighbors = []
     for n in neighborsList:
-        neighbors.append(struct.pack(NEIGHBOR_F, int(n)))
+        if len(n) > 0:
+            neighbors.append(struct.pack(NEIGHBOR_F, int(n)))
     return neighbors
 
 def packDemograpchics(prec):
