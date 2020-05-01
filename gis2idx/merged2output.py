@@ -6,6 +6,7 @@ import pandas as pd
 import logging
 import os
 import sys
+import hashlib
 from shapely.geometry import mapping
 
 from util import (
@@ -20,31 +21,35 @@ from util import (
     # Functions
     parseState
 )
-# TODO: Get correct storage location,
 MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
 
 # .idx data formats
 """
 Key:
+Used:
+    > ->    big endian
+    B ->    unsigned char   -> 1 byte
+    I ->    unsigned int    -> 4 bytes
+    Q ->    u-long long     -> 8 bytes
+Others:
     h ->    short       -> 2 bytes
     i ->    int         -> 4 bytes
-    I ->    uint        -> 4 bytes
     l ->    long        -> 4 or 8 bytes
     q ->    long long   -> 8 bytes
     d ->    double      -> 8 bytes
-    > ->    big endian
     < ->    little endian
 """
 ENDIAN = '>'
-HEADER_F = ENDIAN + 'IIi'   # The first uint(I) is to preserve the MagicNumer's hex value
-NODE_RECORD_F = ENDIAN + 'iii'
-NODE_ID_F = ENDIAN + 'i'    # Different from diagram (original: 'i', is 8B, was 4B), ID must be long
-                            # Must be a longlong(q) because GEOIDs >=10^10
-VERTEX_F = ENDIAN + 'dd'    # Different from diagram (original: 'ii', is 16B, was 8B)
-                            # Vertex coords must be double
-NEIGHBOR_F = NODE_ID_F
-DEMOGRAPHICS_F = ENDIAN + 'iiiiii' # Different from diagram (original: 'iiiiii', is 12B, was 24B)
-                            # Demographics differ from diagram
+HEADER_F = ENDIAN + 'IQQBBII'           # 18 bytes
+NODE_RECORD_F = ENDIAN + 'II'           # 8 bytes
+NODE_ID_F = ENDIAN + 'I'                # 4 bytes
+AREA_F = ENDIAN + 'I'                   # 4 bytes
+NEIGHBOR_F = NODE_ID_F                  # 4 bytes
+DEMOGRAPHICS_F = ENDIAN + 'IIIIII'      # 24 bytes
+
+#Used to break up header for checksum calculation
+HEADER1_F = ENDIAN + 'I' # Just magic num, checksum doesnt need reformatting packing               
+HEADER2_F = ENDIAN + 'BBII'
 
 
 def readLastArtifact(state: str):
@@ -67,19 +72,17 @@ def initializeOutput(state):
         os.mkdir(outloc)
 
 def getNeighbors(df):
-    "Creates a new column 'NEIGHBORS' that stores a list of neighbors for each precinct"
+    "Returns a 2D list that stores a list of neighbors for each precinct"
     geo = df.geometry.tolist()
     
     neighbors = [[] for i in range(len(geo))]
     for i in range(len(geo)):
         for j in range(i):
             if geo[i].touches(geo[j]):
-                neighbors[i].append(str(j))
-                neighbors[j].append(str(i))
-    for i in range(len(geo)):
-        df.at[i, "NEIGHBORS"] = ", ".join(neighbors[i])
-
-    return df
+                neighbors[i].append(j)
+                neighbors[j].append(i)
+    
+    return neighbors
 
 def getPolyCoords(geo):
     "Returns a tuple of x,y coords from a POLYGON in the form ((x1,y1),...,(xn,yn))"
@@ -88,6 +91,7 @@ def getPolyCoords(geo):
         coordsList.append(mapping(geo[i])["coordinates"][0])
     return coordsList
 
+#Unused
 def getVertexStructList(vertList):
     "Returns a list of byte structs that each contain a coordinate (x,y)"
     vertices = []
@@ -97,16 +101,12 @@ def getVertexStructList(vertList):
 
 def getNeighborStructList(neighborsList):
     "Returns a list of byte structs that each contain a neighbor GEOID"
-    neighbors = []
-    for n in neighborsList:
-        if len(n) > 0:
-            neighbors.append(struct.pack(NEIGHBOR_F, int(n)))
+    neighbors = [struct.pack(NEIGHBOR_F, int(n)) for n in neighborsList]
     return neighbors
 
 def packDemograpchics(prec):
     "Returns a byte structs that each contains the demographic data for the precinct"
-    #TODO Missing HispanicPop, added TotalPop
-    #['TotalPop', 'BlackPop', 'NativeAPop', 'AsianPop', 'WhitePop', 'OtherPop']
+    # Sum otherpop and add data in correct order
     otherpop = prec['otherPop'] + prec['pacisPop'] + prec['multiPop']
     return struct.pack(DEMOGRAPHICS_F, int(prec['totalPop']),
                                         int(prec['blackPop']),
@@ -115,23 +115,37 @@ def packDemograpchics(prec):
                                         int(prec['whitePop']),
                                         int(otherpop))
 
-def calcNodeSize(numV, numN):
+def calcNodeSize(numN):
     "Returns the size of the node record in bytes"
     IDSize = struct.calcsize(NODE_ID_F)
-    vertSize = struct.calcsize(VERTEX_F) * numV
-    neighSize = struct.calcsize(NODE_ID_F) * numN
+    areaSize = struct.calcsize(AREA_F)
+    neighborsSize = struct.calcsize(NEIGHBOR_F) * numN
     demoSize = struct.calcsize(DEMOGRAPHICS_F)
-    IDSize = struct.calcsize(NODE_ID_F)
-    return IDSize + vertSize + neighSize + demoSize
+    return IDSize + areaSize + neighborsSize + demoSize
 
-def calcCheckSum():
+def calcCheckSum(state):
     "Calculates a checksum to be included in the data header"
-    return 0xABBAABBA #TODO checksum MD5
+    idxHash = hashlib.md5()
+    with open(OUTPUT_IDX_LOCATION.format(state=state)+'.temp', 'rb') as idx:
+        while True:
+            data = idx.read(2**20)
+            if not data:
+                break
+            idxHash.update(data)
+    idx.close()
+        
+    return idxHash.digest()
 
-def toIdx(df, state: str, coordsList):
+def getStCode(state):
+    return 'IA'
+
+def getNumDisctricts(state):
+    return 4
+
+def toIdx(df, state: str):
     "Formats and outputs a .idx from the data in the dataframe"
-    # Add lists of neighbors for each precinct to the dataframe
-    df = getNeighbors(df)
+    # Get lists of neighbors for each precinct
+    neighborsLists = getNeighbors(df)
 
     # Used to store records for printing later
     nodeRecords = []
@@ -142,52 +156,74 @@ def toIdx(df, state: str, coordsList):
 
     for index, precinct in df.iterrows():
         # Pack node #[index]'s data
-        # node_id
-        nodeID = struct.pack(NODE_ID_F, int(index))
 
-        # vertex #1 - vertex #n_3
-        verticesPacked = getVertexStructList(coordLists[index])
+        # Create and Store Node Record
+        numNeighbors = len(neighborsLists[index])
+        nodeRecord = struct.pack(NODE_RECORD_F, numNeighbors, nodePos)
+        nodeRecords.append(nodeRecord)
+
+        # Pack node data
+        nodeID = struct.pack(NODE_ID_F, int(index))
+        area = struct.pack(AREA_F, precinct.land + precinct.water)
 
         # neighbor_id #1 - neighbor_id #n_4h
-        neighbors = df.at[index, "NEIGHBORS"].split(", ")
-        neighborsPacked = getNeighborStructList(neighbors)
+        neighborsPacked = getNeighborStructList(neighborsLists[index])
 
         # demographics
-        demoPacked = packDemograpchics(precinct) #TODO: uncomment once demographic data works
+        demoPacked = packDemograpchics(precinct)
 
-        #data for node_record #[index]
-        numVertices = len(coordLists[index])
-        numNeighbors = len(neighbors)
-        
-        # Create Node Record
-        nodeRecord = struct.pack(NODE_RECORD_F, numVertices, numNeighbors, nodePos)
-
-        # Store packed data for later printing
-        nodeRecords.append(nodeRecord)
-        node = [nodeID] + verticesPacked + neighborsPacked #TODO + demoPacked
+        # Create and Store Node
+        node = [nodeID] + neighborsPacked + [demoPacked]
         nodes.append(node)
 
         # recalculate nodePos for next record
-        nodePos = nodePos + calcNodeSize(numVertices, numNeighbors)
+        nodePos = nodePos + calcNodeSize(numNeighbors)
         #END OF FORLOOP
 
-    # Create State Header
-    checkSum = calcCheckSum()
+    # Create second half of State Header, missing magic_number, checksum
+    stCode = getStCode(state)
     numNodes = len(df)
-    header = struct.pack(HEADER_F, MAGIC_NUMBER, checkSum, numNodes)
+    numDistricts = getNumDisctricts(state)
+    header2 = struct.pack(HEADER2_F, ord(stCode[0]), ord(stCode[1]), numNodes, numDistricts)
 
     # Output Struct Byte data to idx file
-    fout = open(OUTPUT_IDX_LOCATION.format(state=state), 'wb')
-    total = 0
-    total += fout.write(header)
+    tempOut = open(OUTPUT_IDX_LOCATION.format(state=state)+'.temp', 'wb')
+    tempTotal = 0
+    tempTotal += tempOut.write(header2)
     for record in nodeRecords:
-        total += fout.write(record)
-    for node in nodes:
+        tempTotal += tempOut.write(record)
+    for node in nodes: # will be list of entries (id, area, neighbor1, ..., demographics)
         for data in node:
-            total += fout.write(data)
-    return total
+            tempTotal += tempOut.write(data)
+    tempOut.close()
 
-def toJSON(df, state, coordLists):
+    # Calculate and pack checksum
+    md5 = calcCheckSum(state)
+    checkSum = md5[-4:]
+    header1 = struct.pack(HEADER1_F, MAGIC_NUMBER)
+
+    # Write Out new header including magic_num and checksum
+    idxOut = open(OUTPUT_IDX_LOCATION.format(state=state), 'wb')
+    idxTotal = 0
+    idxTotal += idxOut.write(header1)
+    idxTotal += idxOut.write(checkSum)
+
+    #write out everything else that was stored in temp
+    with open(OUTPUT_IDX_LOCATION.format(state=state)+'.temp', 'rb') as tempIn:
+        data = tempIn.read()
+        idxTotal += idxOut.write(data)
+    tempIn.close()
+
+    # Remove temp
+    os.remove(OUTPUT_IDX_LOCATION.format(state=state)+'.temp')
+    
+    return idxTotal
+
+def toJSON(df, state):
+
+    # Convert each precinct's POLYGON into a list of (x,y) coordinates
+    coordLists = getPolyCoords(df.geometry)
+
     stateName = state[:1].upper() + state[1:]
 
     maxDistricts = 4 
@@ -247,13 +283,10 @@ def main(arg):
     #initialize output directory
     initializeOutput(state)
 
-    # Convert each precinct's POLYGON into a list of (x,y) coordinates
-    coordLists = getPolyCoords(df.geometry)
-
     # Output to .idx file
     if(arg == None or arg == '-idx'):
         logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
-        written = toIdx(df, state, coordLists)
+        written = toIdx(df, state)
         logging.debug(f"Finished writing {written} bytes to .idx file")
 
     # Output to .JSON file
