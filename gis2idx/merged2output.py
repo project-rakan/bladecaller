@@ -7,6 +7,8 @@ import logging
 import os
 import sys
 import hashlib
+import time
+import csv
 from shapely.geometry import mapping
 
 from util import (
@@ -16,6 +18,7 @@ from util import (
     OUTPUT_IDX_LOCATION,
     OUTPUT_JSON_LOCATION,
     MAGIC_NUMBER,
+    STATEKEY_LOCATION,
     LOGMODE,
 
     # Functions
@@ -136,13 +139,23 @@ def calcCheckSum(state):
         
     return idxHash.digest()
 
-def getStCode(state):
-    return 'IA'
+def getStateCode(state):
+    state = state[:1].upper() + state[1:]
+
+    stateKeys = csv.reader(open(STATEKEY_LOCATION))
+    for row in stateKeys:
+        if state == row[2]:
+            return row[1]
+
+    return None
 
 def getNumDisctricts(state):
     return 4
 
-def toIdx(df, state: str):
+def getTimeDiff(start):
+    return round(time.time()-start, 1)
+
+def toIdx(df, state: str, stCode: str):
     "Formats and outputs a .idx from the data in the dataframe"
     # Get lists of neighbors for each precinct
     neighborsLists = getNeighbors(df)
@@ -181,7 +194,6 @@ def toIdx(df, state: str):
         #END OF FORLOOP
 
     # Create second half of State Header, missing magic_number, checksum
-    stCode = getStCode(state)
     numNodes = len(df)
     numDistricts = getNumDisctricts(state)
     header2 = struct.pack(HEADER2_F, ord(stCode[0]), ord(stCode[1]), numNodes, numDistricts)
@@ -219,7 +231,7 @@ def toIdx(df, state: str):
     
     return idxTotal
 
-def toJSON(df, state):
+def toJSON(df, state: str, stCode: str):
 
     # Convert each precinct's POLYGON into a list of (x,y) coordinates
     coordLists = getPolyCoords(df.geometry)
@@ -270,6 +282,8 @@ def toJSON(df, state):
     
 def main(arg):
     "Creates the output .idx and json files from the cleaned and merged dataframe"
+    startTime = time.time()
+
     # Get state
     logging.debug(f"Parsing state")
     state = parseState()
@@ -283,17 +297,23 @@ def main(arg):
     #initialize output directory
     initializeOutput(state)
 
+    # Get state code, ex: 'WA' for Washington
+    stCode = getStateCode(state)
+    import pdb; pdb.set_trace()
+
     # Output to .idx file
     if(arg == None or arg == '-idx'):
         logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
-        written = toIdx(df, state)
+        written = toIdx(df, state, stCode)
         logging.debug(f"Finished writing {written} bytes to .idx file")
 
     # Output to .JSON file
     if (arg == None or arg == '-json'):
         logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
-        toJSON(df, state, coordLists)
+        toJSON(df, state, stCode)
         logging.debug(f"Finished writing to .JSON file")
+
+    logging.debug(f"Finished writing output in {getTimeDiff(startTime)} seconds\n\n\n")
 
 
 if __name__ == "__main__":
