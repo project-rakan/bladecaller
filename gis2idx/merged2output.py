@@ -1,3 +1,11 @@
+# Usage: python merged2output.py [state] [Options]
+# 'state' is a lowercase name of a US State
+# Options:
+# -idx      -> create only the state's .idx file
+# -json     -> create only the state's .json file
+# -jnovert  -> create only the state's .novert.json file
+# None      -> create all files (.idx, .json, .novert.json)
+
 import pickle
 import io
 import json
