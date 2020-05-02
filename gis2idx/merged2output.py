@@ -227,7 +227,7 @@ def toIdx(df, state: str, stCode: str, numDistricts: int):
     
     return idxTotal
 
-def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int):
+def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=True):
 
     # Convert each precinct's POLYGON into a list of (x,y) coordinates
     coordLists = getPolyCoords(df.geometry)
@@ -236,13 +236,15 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int):
     for index, prec in df.iterrows():
         precName = prec['name']
         precID = index
+
         vertices = []
-        for v in coordLists[index]:
-            coord = {
-                "lat": float(v[0]),
-                "lng": float(v[1])
-            }
-            vertices.append(coord)
+        if includeV:
+            for v in coordLists[index]:
+                coord = {
+                    "lat": float(v[0]),
+                    "lng": float(v[1])
+                }
+                vertices.append(coord)
         districtID = 0 #TODO: Hard coded 0 for missing district IDs
 
         precinctEntry = {
@@ -260,7 +262,11 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int):
         "precincts": precincts
     }
 
-    with open(OUTPUT_JSON_LOCATION.format(state=state), "w") as outfile:
+    json_loc = OUTPUT_JSON_LOCATION.format(state=state)
+    if not includeV:
+        json_loc = json_loc[:-5]+'.novert.json'
+
+    with open(json_loc, "w") as outfile:
         return outfile.write(json.dumps(dictionary, indent = 4))
         
     
@@ -293,7 +299,13 @@ def main(arg):
     if (arg == None or arg == '-json'):
         logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
         written = toJSON(df, state, stCode, numDistricts, fips)
-        logging.debug(f"Finished writing {written} bytes to {state}.JSON")
+        logging.debug(f"Finished writing {written} bytes to {state}.json")
+
+    if (arg == None or arg == '-jnovert'):
+        # Chang where to write to
+        logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.novert.json')
+        written = toJSON(df, state, stCode, numDistricts, fips, False)
+        logging.debug(f"Finished writing {written} bytes to {state}.novert.json")
 
     logging.debug(f"Finished writing output in {getTimeDiff(startTime)} seconds\n\n\n")
 
