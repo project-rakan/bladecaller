@@ -154,12 +154,19 @@ class State(object):
         self.save()
         abs_path = os.path.abspath(STATEPARSER_CACHE_LOCATION + self._state + '.state.pk')
         output_path = os.path.abspath(STATEPARSER_CACHE_LOCATION + self._state + '.demographics.pk')
+        district_output_path = os.path.abspath(STATEPARSER_CACHE_LOCATION + self._state + '.districts.pk')
+        district_shapes = os.path.abspath(INPUT_PREFIX + "116_congressional_districts")
         os.system(f"cd gis2idx/datamerger && python3.7 manage.py parse_census_df \"{abs_path}\" \"{output_path}\"")
+        os.system(f"cd gis2idx/datamerger && python3.7 manage.py merge_districts_df \"{abs_path}\" \"{district_output_path}\" {district_shapes}")
         
         with io.open(output_path, 'rb') as handle:
             census_df = pickle.load(handle)
     
+        with io.open(district_output_path, 'rb') as handle:
+            district_df = pickle.load(handle)
+
         self._demographic_df = pd.merge(census_df, self._vtd_df, right_on='GEOID', left_on='geoid', how='left')
+        self._demographic_df = pd.merge(district_df, self._demographic_df, right_on='GEOID', left_on='geoid', how='left')
         self._demographic_df = gpd.GeoDataFrame(self._demographic_df)
 
         # Drop multi-polygons here
@@ -168,12 +175,10 @@ class State(object):
         self.dissolveGranularity(dissolvePattern)
 
         for column in [
-            'center_y', 'center_x', 'vtdi', 'vtd', 'geoid', 'GEOID'
+            'center_y', 'center_x', 'vtdi', 'vtd', 'geoid_x', 'GEOID', 'geoid_y'
         ]:
             del self._demographic_df[column]
         
-        
-
         self.save()
 
     def save(self):
