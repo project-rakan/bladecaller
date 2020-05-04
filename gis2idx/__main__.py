@@ -4,16 +4,12 @@
 A command line based tool for converting CSV + US Census GIS files 
 """
 
-import io
-import os
-import json
-import geopandas
+import sys
 import logging
-import binascii
-import pandas as pd
+import os
 
-from typing import IO, Any
-from geopandas.geodataframe import GeoDataFrame
+import stateparser
+import merged2output
 
 from exceptions import (
     DirectoryNotFoundError,
@@ -25,104 +21,127 @@ from util import (
     # Constants
     INPUT_PREFIX,
     OUTPUT_PREFIX,
-    INPUT_CSV_LOCATION, 
-    INPUT_GIS_LOCATION,
     OUTPUT_IDX_LOCATION,
     OUTPUT_JSON_LOCATION,
-    CACHE_LOCATION,
-    MAGIC_NUMBER,
-
-    # Functions
-    intToStrHex
 )
 
-def processState(state: str):
+from stateparser import (
+    VTD_LOCATION,
+    TRACTS_LOCATION,
+    VOTES_LOCATION,
+    DEMOGRAPHIC_LOCATION
+)
+
+from merged2output import (
+    MERGED_DF_INPUT
+)
+
+# This is the default set of states that the method will run on
+# For dev purposes only, TODO: remove this list
+WORKING = ['iowa']
+
+def processState(state: str, args):
     """
         Converts a state directory (location of GIS and CSV file) and produces an .idx and .json file.
         Assumes the proper state GIS/CSV files exist
     """
-    logging.debug(f"Processing state: {state}")
+    logging.info(f"Processing state: {state}")
+    if '-use_cache' in args:
+        logging.info(f"Attempting to use previously cached stateparser data..")
+        if not os.path.exists(MERGED_DF_INPUT.format(state=state)):
+            logging.info(f"Cannot find cached data for {state}")
+            logging.info(f"Running stateparser({state})")
+            stateparser.main(state)
+        else:
+            logging.info(f"Found cached data for {state}!")
+    else:
+        logging.info(f"Running stateparser({state})")
+        stateparser.main(state)
 
-    # US Census GIS Files
-    census_df: GeoDataFrame = geopandas.read_file(INPUT_GIS_LOCATION.format(state=state))
+    #-idx, -readable, -json, -novert, -all, or NONE, Documentation in merged2output.py
+    # default merged2output args
+    outputArgs = [state] # default merged2output args
+    for arg in args:
+        if arg.startswith('-') and arg != '-use_cache':
+            outputArgs.append(arg)
 
-    # Our compiled research
-    demographic_df: pd.DataFrame = pd.read_csv(INPUT_CSV_LOCATION.format(state=state))
-
-    # Create our output directory if it doesn't exist
-    if not os.path.isdir(f"{OUTPUT_PREFIX}{state}"):
-        os.mkdir(f"{OUTPUT_PREFIX}{state}")
+    logging.info(f"Running merged2output({str(outputArgs)[1:-1]})")
+    merged2output.main(outputArgs)
+    return 1
     
-    # Create the IDX file
-    createIDXFile(OUTPUT_IDX_LOCATION.format(state=state))
+def sanityChecks(state: str):
+    if not os.path.isdir(VTD_LOCATION.format(state=state)):
+            logging.warning(f"VTD gis files not found for {state}")
+            raise NoGISFilesFoundException()
 
-    raise NotImplementedError("Magic Happens Here")
+    if not os.path.isdir(TRACTS_LOCATION.format(state=state)):
+        logging.warning(f"Census tract gis files not found for {state}")
+        raise NoGISFilesFoundException()
 
-    # Clean the water out
-    # Create edges
+    if not os.path.isdir(VOTES_LOCATION.format(state=state)):
+        logging.warning(f"Voting data gis files not found for {state}")
+        raise NoGISFilesFoundException()
 
+    if not os.path.isfile(DEMOGRAPHIC_LOCATION.format(state=state)):
+        logging.warning(f"Demographics CSV file not found for {state}")
+        raise NoCSVFilesFoundException()
 
-def createJSONFile(location: str):
-    with io.open(location) as handle:
-        pass
+    if os.path.isfile(OUTPUT_IDX_LOCATION.format(state=state)):
+        logging.warning(f"Overwriting existing IDX file for {state}")
 
+    if os.path.isfile(OUTPUT_JSON_LOCATION.format(state=state)):
+        logging.warning(f"Overwriting existing JSON file for {state}")
 
-def writeHeader(handle: IO[Any], magicHeader: str, checksum: int, numberOfNodes: int):
-    "Write the magic number at the beginning of the file."
+def getArgs():
+    args = []
+    for arg in sys.argv:
+        if arg.startswith('-'):
+            args.append(arg)
+    return set(args)
 
-    # Convert to a string hex checksum (add 0s to the front of the 
-    # checksum until there are 4 bytes)
-    # Need to check when the size exceeds 4 bytes
-    handle.seek(0)
-    handle.write(binascii.unhexlify(magicHeader))
-    handle.write(binascii.unhexlify(intToStrHex(checksum, maxBytes=4)))
-    handle.write(binascii.unhexlify(intToStrHex(numberOfNodes, maxBytes=4)))
-
-
-def createIDXFile(location: str):
-    "Export an IDX file to the location specified"
-    with io.open(location, 'wb') as handle:
-        # Fill the header with dummy data for now
-        writeHeader(handle, '0' * len(MAGIC_NUMBER), 0, 0)
-
-        # TODO: Follow format defined in spec
-
-        # Once everything has been written, write the real header
-        writeHeader(handle, MAGIC_NUMBER, 0, 0)
-
-
-def main():
-    "Reads all states in data/ and produces their artifacts in the output file"
-
-    # Check if the directory containing states exist/output directory exists
+def checkDirectories():
     if not os.path.isdir(INPUT_PREFIX):
         raise DirectoryNotFoundError(f"Unable to find input directory: '{INPUT_PREFIX}'")
 
     if not os.path.isdir(OUTPUT_PREFIX):
         raise DirectoryNotFoundError(f"Unable to find output directory: '{OUTPUT_PREFIX}'")
 
+def main():
+    "Reads all states in data/ and produces their artifacts in the output file"
+
+    # Check if the directory containing states exist/output directory exists
+    checkDirectories()
+
+    # Get args set
+    args = getArgs()
+
+    # Get state argument if it exists
+    stateList = os.listdir(INPUT_PREFIX)
+    if len(sys.argv) > 1:
+        if sys.argv[1] in stateList:
+            stateList = [sys.argv[1]]
+
     # Iterate through all input states
-    for state in os.listdir(INPUT_PREFIX):
-        logging.debug(f"Found state {state}")
-        # Perform a few sanity checks
+    for state in stateList:
+        if '.' in state:
+            continue
 
-        if not os.path.isdir(INPUT_GIS_LOCATION.format(state=state)):
-            logging.warning(f"GIS files not found for {state}")
-            raise NoGISFilesFoundException()
+        logging.info(f"Found state {state}")
 
-        if not os.path.isfile(INPUT_CSV_LOCATION.format(state=state)):
-            logging.warning(f"CSV file not found for {state}")
-            raise NoCSVFilesFoundException()
-
-        if os.path.isfile(OUTPUT_IDX_LOCATION.format(state=state)):
-            logging.warning(f"Overwriting existing IDX file for {state}")
-
-        if os.path.isfile(OUTPUT_JSON_LOCATION.format(state=state)):
-            logging.warning(f"Overwriting existing JSON file for {state}")
+        # Sanity Checks for input data
+        sanityChecks(state)
 
         # Then perform processing
-        processState(state)
+        if state in WORKING:
+            processState(state, args)
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='gis2idx.log',level=logging.DEBUG)
+    # Quick sanity check before running huge process on each state
+    if len(sys.argv) == 1 or sys.argv[1].startswith('-') :
+        print('Are you sure you would like to process all states? [y/n] ')
+        inp = input()
+        if inp not in ['y', 'Y']:
+            sys.exit()
+
+    logging.basicConfig(filename='gis2idx.log',level=logging.INFO,filemode='w')
     main()
