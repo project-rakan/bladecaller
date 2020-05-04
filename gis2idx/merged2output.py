@@ -1,10 +1,14 @@
 # Usage: python merged2output.py [state] [Options]
 # 'state' is a lowercase name of a US State
 # Options:
-# -idx      -> create only the state's .idx file
-# -json     -> create only the state's .json file
-# -jnovert  -> create only the state's .novert.json file
-# None      -> create all files (.idx, .json, .novert.json)
+# None      -> create the .idx, .json, .novert.json files
+# -idx      -> create the state's .idx file
+# -json     -> create the state's .json file
+# -novert  -> create the state's .novert.json file
+# -readable -> create a .idx.json that contains the data that is encoded in the .idx
+#                (will also recreate the .idx file)
+# -all      -> create all 4 file types
+
 
 import pickle
 import io
@@ -17,6 +21,7 @@ import sys
 import hashlib
 import time
 import csv
+import zlib
 from shapely.geometry import mapping
 
 from util import (
@@ -33,6 +38,8 @@ from util import (
     parseState
 )
 MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
+
+ARGUMENTS = set(['-idx', '-json', '-jnovert', '-readable'])
 
 # .idx data formats
 """
@@ -59,7 +66,7 @@ NEIGHBOR_F = NODE_ID_F                  # 4 bytes
 DEMOGRAPHICS_F = ENDIAN + 'IIIIII'      # 24 bytes
 
 #Used to break up header for checksum calculation
-HEADER1_F = ENDIAN + 'I' # Just magic num, checksum doesnt need reformatting packing               
+HEADER1_F = ENDIAN + 'II' # Just magic num, checksum doesnt need reformatting packing               
 HEADER2_F = ENDIAN + 'BBII'
 
 
@@ -119,12 +126,20 @@ def packDemograpchics(prec):
     "Returns a byte structs that each contains the demographic data for the precinct"
     # Sum otherpop and add data in correct order
     otherpop = prec['otherPop'] + prec['pacisPop'] + prec['multiPop']
-    return struct.pack(DEMOGRAPHICS_F, int(prec['totalPop']),
+    packed = struct.pack(DEMOGRAPHICS_F, int(prec['totalPop']),
                                         int(prec['blackPop']),
                                         int(prec['nativeAPop']),
                                         int(prec['asianPop']),
                                         int(prec['whitePop']),
                                         int(otherpop))
+    readable = [int(prec['totalPop']),
+                int(prec['blackPop']),
+                int(prec['nativeAPop']),
+                int(prec['asianPop']),
+                int(prec['whitePop']),
+                int(otherpop)]
+
+    return packed, readable
 
 def calcNodeSize(numN):
     "Returns the size of the node record in bytes"
@@ -136,16 +151,17 @@ def calcNodeSize(numN):
 
 def calcCheckSum(state):
     "Calculates a checksum to be included in the data header"
-    idxHash = hashlib.md5()
+    prev = 0
     with open(OUTPUT_IDX_LOCATION.format(state=state)+'.temp', 'rb') as idx:
         while True:
             data = idx.read(2**20)
             if not data:
                 break
-            idxHash.update(data)
+            prev = zlib.crc32(data, prev)
+
     idx.close()
-        
-    return idxHash.digest()
+
+    return prev
 
 def getStateMeta(state):
     state = state[:1].upper() + state[1:]
@@ -160,7 +176,7 @@ def getStateMeta(state):
 def getTimeDiff(start):
     return round(time.time()-start, 1)
 
-def toIdx(df, state: str, stCode: str, numDistricts: int):
+def toIdx(df, state: str, stCode: str, numDistricts: int, readable=False):
     "Formats and outputs a .idx from the data in the dataframe"
     # Get lists of neighbors for each precinct
     neighborsLists = getNeighbors(df)
@@ -168,6 +184,10 @@ def toIdx(df, state: str, stCode: str, numDistricts: int):
     # Used to store records for printing later
     nodeRecords = []
     nodes = []
+
+    # In case the user wants readable output for testing
+    readableRecs = []
+    readableNodes = []
 
     # To keep track of position of node records, cumulative length of previous records
     nodePos = 0
@@ -188,14 +208,22 @@ def toIdx(df, state: str, stCode: str, numDistricts: int):
         neighborsPacked = getNeighborStructList(neighborsLists[index])
 
         # demographics
-        demoPacked = packDemograpchics(precinct)
+        demoPacked, readableDemo = packDemograpchics(precinct)
 
         # Create and Store Node
-        node = [nodeID] + neighborsPacked + [demoPacked]
+        node = [nodeID] + [area] + neighborsPacked + [demoPacked]
         nodes.append(node)
 
         # recalculate nodePos for next record
         nodePos = nodePos + calcNodeSize(numNeighbors)
+
+        if (readable):
+            readableRecs.append((int(index), numNeighbors, nodePos))
+            readableNodes.append((int(index), 
+                                precinct.land + precinct.water,
+                                neighborsLists[index],
+                                readableDemo))
+
         #END OF FORLOOP
 
     # Create second half of State Header, missing magic_number, checksum
@@ -214,15 +242,13 @@ def toIdx(df, state: str, stCode: str, numDistricts: int):
     tempOut.close()
 
     # Calculate and pack checksum
-    md5 = calcCheckSum(state)
-    checkSum = md5[-4:]
-    header1 = struct.pack(HEADER1_F, MAGIC_NUMBER)
+    checkSum = calcCheckSum(state)
+    header1 = struct.pack(HEADER1_F, MAGIC_NUMBER, checkSum)
 
     # Write Out new header including magic_num and checksum
     idxOut = open(OUTPUT_IDX_LOCATION.format(state=state), 'wb')
     idxTotal = 0
     idxTotal += idxOut.write(header1)
-    idxTotal += idxOut.write(checkSum)
 
     #write out everything else that was stored in temp
     with open(OUTPUT_IDX_LOCATION.format(state=state)+'.temp', 'rb') as tempIn:
@@ -232,8 +258,53 @@ def toIdx(df, state: str, stCode: str, numDistricts: int):
 
     # Remove temp
     os.remove(OUTPUT_IDX_LOCATION.format(state=state)+'.temp')
+
+    # print readable .idx.json
+    if(readable):
+        logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state) + '.json')
+        written = readableIDX(state, checkSum, stCode, numNodes, numDistricts, readableRecs, readableNodes)
+        logging.debug(f"Finished writing {written} bytes to {state}.idx.json")
     
     return idxTotal
+
+def readableIDX(state, checkSum, stCode, numNodes, numDistricts, nodeRecords, nodesList):
+    records = []
+    for rec in nodeRecords:
+        record = {
+            "nodeID": rec[0],
+            "numNeighbors": rec[1],
+            "nodePos": rec[2]
+        }
+        records.append(record)
+    nodes = []
+    for n in nodesList:
+        node = {
+            "nodeID": n[0],
+            "area": n[1],
+            "neighbors": n[2],
+            "demographics": {
+                "totalPop": n[3][0],
+                "blackPop": n[3][1],
+                "nativeAPop": n[3][2],
+                "asianPoP": n[3][3],
+                "whitePop": n[3][4],
+                "otherPop": n[3][5]
+            }
+        }
+        nodes.append(node)
+    header = {
+        "magic_num": hex(MAGIC_NUMBER),
+        "checkSum": hex(checkSum),
+        "stCode": stCode,
+        "numNodes": numNodes,
+        "numDistricts": numDistricts,
+        "node_records": records,
+        "nodes": nodes
+    }
+
+    with open(OUTPUT_IDX_LOCATION.format(state=state)+'.json', "w") as outfile:
+        return outfile.write(json.dumps(header, indent = 4))
+
 
 def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=True):
 
@@ -276,15 +347,37 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=T
 
     with open(json_loc, "w") as outfile:
         return outfile.write(json.dumps(dictionary, indent = 4))
+
+def checkArgs(args) :
+    "Checks that all arguments passed in are valid, returns only the valid ones in a set"
+    clean = []
+    if args == None:
+        return None
+    for arg in args:
+        if arg == '-all':
+            return set('-all')
+        if arg not in ARGUMENTS:
+            print("Unknown argument: " + arg)
+        else:
+            clean.append(arg)
+    if len(clean) == 0:
+        return None
+    return set(clean) 
+
+    
         
     
-def main(arg):
+def main(args):
     "Creates the output .idx and json files from the cleaned and merged dataframe"
     startTime = time.time()
+
+    # Check args
+    args = checkArgs(args)
 
     # Get state
     logging.debug(f"Parsing state")
     state = parseState()
+
     # Get metadata
     stCode, numDistricts, fips= getStateMeta(state)
     logging.debug(f"Retrieved state {state}")
@@ -298,18 +391,23 @@ def main(arg):
     initializeOutput(state)
 
     # Output to .idx file
-    if(arg == None or arg == '-idx'):
+    if ('-all' in args or '-readable' in args):
+        logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
+        written = toIdx(df, state, stCode, numDistricts, True)
+        logging.debug(f"Finished writing {written} bytes to {state}.idx")
+    elif (args == None or '-idx' in args):
         logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
         written = toIdx(df, state, stCode, numDistricts)
         logging.debug(f"Finished writing {written} bytes to {state}.idx")
+    
 
     # Output to .JSON file
-    if (arg == None or arg == '-json'):
+    if (args == None or '-json' in args or '-all' in args):
         logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
         written = toJSON(df, state, stCode, numDistricts, fips)
         logging.debug(f"Finished writing {written} bytes to {state}.json")
 
-    if (arg == None or arg == '-jnovert'):
+    if (args == None or '-novert' in args or '-all' in args):
         # Chang where to write to
         logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.novert.json')
         written = toJSON(df, state, stCode, numDistricts, fips, False)
@@ -320,5 +418,5 @@ def main(arg):
 
 if __name__ == "__main__":
     logging.basicConfig(filename='merged2output.log', level=logging.DEBUG, filemode=LOGMODE)
-    main(sys.argv[2] if len(sys.argv) >= 3 else None)
+    main(set(sys.argv[2:]) if len(sys.argv) >= 3 else None)
 
