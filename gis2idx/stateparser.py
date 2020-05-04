@@ -179,11 +179,6 @@ class State(object):
         ]:
             del self._demographic_df[column]
         
-<<<<<<< HEAD
-    
-
-=======
->>>>>>> 72745fa65456af072b09f5953e5580eeaa9b59d7
         self.save()
 
     def save(self):
