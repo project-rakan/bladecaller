@@ -355,7 +355,7 @@ def checkArgs(args) :
         return None
     for arg in args:
         if arg == '-all':
-            return set('-all')
+            return set([arg])
         if arg not in ARGUMENTS:
             print("Unknown argument: " + arg)
         else:
@@ -391,7 +391,7 @@ def main(args):
     initializeOutput(state)
 
     # Output to .idx file
-    if ('-all' in args or '-readable' in args):
+    if (args != None and ('-all' in args or '-readable' in args)):
         logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
         written = toIdx(df, state, stCode, numDistricts, True)
         logging.debug(f"Finished writing {written} bytes to {state}.idx")
