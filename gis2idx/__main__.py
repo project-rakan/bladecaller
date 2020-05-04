@@ -38,7 +38,7 @@ from merged2output import (
 
 # This is the default set of states that the method will run on
 # For dev purposes only, TODO: remove this list
-WORKING = ['iowa']
+WORKING = ['iowa', 'washington']
 
 def processState(state: str, args):
     """
@@ -57,7 +57,7 @@ def processState(state: str, args):
     else:
         logging.info(f"Running stateparser({state})")
         stateparser.main(state)
-
+    
     #-idx, -readable, -json, -novert, -all, or NONE, Documentation in merged2output.py
     # default merged2output args
     outputArgs = [state] # default merged2output args
@@ -67,7 +67,6 @@ def processState(state: str, args):
 
     logging.info(f"Running merged2output({str(outputArgs)[1:-1]})")
     merged2output.main(outputArgs)
-    return 1
     
 def sanityChecks(state: str):
     if not os.path.isdir(VTD_LOCATION.format(state=state)):
@@ -123,7 +122,7 @@ def main():
 
     # Iterate through all input states
     for state in stateList:
-        if '.' in state:
+        if '.' in state or '_' in state:
             continue
 
         logging.info(f"Found state {state}")
