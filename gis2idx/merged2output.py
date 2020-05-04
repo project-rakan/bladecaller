@@ -91,7 +91,7 @@ def initializeOutput(state):
 
 def getNeighbors(df):
     "Returns a 2D list that stores a list of neighbors for each precinct"
-    geo = df.geometry.tolist()
+    geo = df['geometry'].tolist()
     
     neighbors = [[] for i in range(len(geo))]
     for i in range(len(geo)):
@@ -325,7 +325,8 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=T
                     "lng": float(v[1])
                 }
                 vertices.append(coord)
-        districtID = 0 #TODO: Hard coded 0 for missing district IDs
+
+        districtID = prec['district']
 
         precinctEntry = {
             "name": precName,

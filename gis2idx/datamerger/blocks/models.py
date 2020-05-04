@@ -26,4 +26,7 @@ class TractBlock(models.Model):
     pacisPop = models.IntegerField(default=0)
     otherPop = models.IntegerField(default=0)
     multiPop = models.IntegerField(default=0)
-    
+
+class DistrictBlock(models.Model):
+    district_id = models.IntegerField()
+    geometry = gis_models.GeometryField()
