@@ -172,7 +172,7 @@ class State(object):
         ]:
             del self._demographic_df[column]
         
-        
+    
 
         self.save()
 
@@ -197,16 +197,14 @@ class State(object):
 def initializeCache():
     "Create the cache defined in util.py if it doesn't exist"
 
-    logging.debug("Initializing Cache")
     if not os.path.isdir(CACHE_LOCATION):
-        logging.debug(f"Creating {CACHE_LOCATION}")
+        logging.info(f"Creating {CACHE_LOCATION}")
         os.mkdir(CACHE_LOCATION)
     if not os.path.isdir(STATEPARSER_CACHE_LOCATION):
-        logging.debug(f"Creating {STATEPARSER_CACHE_LOCATION}")
+        logging.info(f"Creating {STATEPARSER_CACHE_LOCATION}")
         os.mkdir(STATEPARSER_CACHE_LOCATION)
 
-def main():
-    state = parseState()
+def main(state):
     stateHandle = State(state)
     stateHandle.loadVtd()
     stateHandle.loadTracts()
@@ -216,5 +214,5 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='stateparser.log', level=logging.DEBUG)
-    main()
+    logging.basicConfig(filename='stateparser.log', level=logging.info)
+    main(parseState())

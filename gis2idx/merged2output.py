@@ -39,7 +39,7 @@ from util import (
 )
 MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
 
-ARGUMENTS = set(['-idx', '-json', '-jnovert', '-readable'])
+ARGUMENTS = set(['-idx', '-json', '-novert', '-readable'])
 
 # .idx data formats
 """
@@ -79,14 +79,14 @@ def readLastArtifact(state: str):
 def initializeOutput(state):
     "Create the output directory defined in util.py if it doesn't exist"
 
-    logging.debug("Initializing Output")
+    logging.info("Initializing Output")
     if not os.path.isdir(OUTPUT_PREFIX):
-        logging.debug(f"Creating {OUTPUT_PREFIX}")
+        logging.info(f"Creating {OUTPUT_PREFIX}")
         os.mkdir(OUTPUT_PREFIX)
     
     outloc = OUTPUT_PREFIX + f"{state}/"
     if not os.path.isdir(outloc):
-        logging.debug(f"Creating {outloc}")
+        logging.info(f"Creating {outloc}")
         os.mkdir(outloc)
 
 def getNeighbors(df):
@@ -256,16 +256,17 @@ def toIdx(df, state: str, stCode: str, numDistricts: int, readable=False):
         idxTotal += idxOut.write(data)
     tempIn.close()
 
+    logging.info(f"Finished writing {idxTotal} bytes to {state}.idx")
+
     # Remove temp
     os.remove(OUTPUT_IDX_LOCATION.format(state=state)+'.temp')
 
     # print readable .idx.json
     if(readable):
-        logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state) + '.json')
+        logging.info(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state) + '.json')
         written = readableIDX(state, checkSum, stCode, numNodes, numDistricts, readableRecs, readableNodes)
-        logging.debug(f"Finished writing {written} bytes to {state}.idx.json")
+        logging.info(f"Finished writing {written} bytes to {state}.idx.json")
     
-    return idxTotal
 
 def readableIDX(state, checkSum, stCode, numNodes, numDistricts, nodeRecords, nodesList):
     records = []
@@ -351,7 +352,7 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=T
 def checkArgs(args) :
     "Checks that all arguments passed in are valid, returns only the valid ones in a set"
     clean = []
-    if args == None:
+    if args == None or len(args) == 0:
         return None
     for arg in args:
         if arg == '-all':
@@ -371,52 +372,52 @@ def main(args):
     "Creates the output .idx and json files from the cleaned and merged dataframe"
     startTime = time.time()
 
-    # Check args
-    args = checkArgs(args)
-
     # Get state
-    logging.debug(f"Parsing state")
-    state = parseState()
+    state = args[0]
+    logging.info(f"Outputing data for state: " + state)
+    
+
+    # Check args
+    args = checkArgs(set(args[1:]))
 
     # Get metadata
     stCode, numDistricts, fips= getStateMeta(state)
-    logging.debug(f"Retrieved state {state}")
+    logging.info(f"Retrieved state {state}")
 
     # Load in merged data
-    logging.debug(f"Loading in the artifact: " + MERGED_DF_INPUT.format(state=state))
+    logging.info(f"Loading in the artifact: " + MERGED_DF_INPUT.format(state=state))
     df = readLastArtifact(state)
-    logging.debug(f"Successfully loaded artifact")
+    logging.info(f"Successfully loaded artifact")
 
     #initialize output directory
     initializeOutput(state)
 
     # Output to .idx file
     if (args != None and ('-all' in args or '-readable' in args)):
-        logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
+        logging.info(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
         written = toIdx(df, state, stCode, numDistricts, True)
-        logging.debug(f"Finished writing {written} bytes to {state}.idx")
     elif (args == None or '-idx' in args):
-        logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
+        logging.info(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
         written = toIdx(df, state, stCode, numDistricts)
-        logging.debug(f"Finished writing {written} bytes to {state}.idx")
     
 
     # Output to .JSON file
     if (args == None or '-json' in args or '-all' in args):
-        logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
+        logging.info(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
         written = toJSON(df, state, stCode, numDistricts, fips)
-        logging.debug(f"Finished writing {written} bytes to {state}.json")
+        logging.info(f"Finished writing {written} bytes to {state}.json")
 
     if (args == None or '-novert' in args or '-all' in args):
         # Chang where to write to
-        logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.novert.json')
+        logging.info(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.novert.json')
         written = toJSON(df, state, stCode, numDistricts, fips, False)
-        logging.debug(f"Finished writing {written} bytes to {state}.novert.json")
+        logging.info(f"Finished writing {written} bytes to {state}.novert.json")
 
-    logging.debug(f"Finished writing output in {getTimeDiff(startTime)} seconds\n\n\n")
+    logging.info(f"Finished writing {state} output in {getTimeDiff(startTime)} seconds\n\n")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='merged2output.log', level=logging.DEBUG, filemode=LOGMODE)
-    main(set(sys.argv[2:]) if len(sys.argv) >= 3 else None)
+    import pdb; pdb.set_trace()
+    logging.basicConfig(filename='merged2output.log', level=logging.info, filemode=LOGMODE)
+    main(sys.argv[1:] if len(sys.argv) >= 2 else None)
 
