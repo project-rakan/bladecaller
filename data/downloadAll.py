@@ -3,6 +3,15 @@
 import io
 import os
 
+def download116District():
+    if not os.path.isdir("116_congressional_districts"):
+        os.mkdir("116_congressional_districts")
+
+    target = "https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_cd116_20m.zip"
+    os.system(f"wget -O temp.zip https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_cd116_20m.zip")
+    os.system(f"unzip temp.zip -d 116_congressional_districts/")
+    os.system(f"rm temp.zip")
+
 def main():
     with io.open("stateKeys.csv") as handle:
         lines = handle.readlines()
@@ -41,4 +50,5 @@ def main():
             os.mkdir(f"{state_name}/votes")
 
 if __name__ == "__main__":
-    main()
+    download116District()
+    # main()
