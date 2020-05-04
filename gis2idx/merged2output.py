@@ -1,3 +1,11 @@
+# Usage: python merged2output.py [state] [Options]
+# 'state' is a lowercase name of a US State
+# Options:
+# -idx      -> create only the state's .idx file
+# -json     -> create only the state's .json file
+# -jnovert  -> create only the state's .novert.json file
+# None      -> create all files (.idx, .json, .novert.json)
+
 import pickle
 import io
 import json
@@ -139,23 +147,20 @@ def calcCheckSum(state):
         
     return idxHash.digest()
 
-def getStateCode(state):
+def getStateMeta(state):
     state = state[:1].upper() + state[1:]
 
     stateKeys = csv.reader(open(STATEKEY_LOCATION))
     for row in stateKeys:
         if state == row[2]:
-            return row[1]
+            return row[1], int(row[4]), int(row[0])
 
     return None
-
-def getNumDisctricts(state):
-    return 4
 
 def getTimeDiff(start):
     return round(time.time()-start, 1)
 
-def toIdx(df, state: str, stCode: str):
+def toIdx(df, state: str, stCode: str, numDistricts: int):
     "Formats and outputs a .idx from the data in the dataframe"
     # Get lists of neighbors for each precinct
     neighborsLists = getNeighbors(df)
@@ -195,7 +200,6 @@ def toIdx(df, state: str, stCode: str):
 
     # Create second half of State Header, missing magic_number, checksum
     numNodes = len(df)
-    numDistricts = getNumDisctricts(state)
     header2 = struct.pack(HEADER2_F, ord(stCode[0]), ord(stCode[1]), numNodes, numDistricts)
 
     # Output Struct Byte data to idx file
@@ -231,34 +235,24 @@ def toIdx(df, state: str, stCode: str):
     
     return idxTotal
 
-def toJSON(df, state: str, stCode: str):
+def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=True):
 
     # Convert each precinct's POLYGON into a list of (x,y) coordinates
     coordLists = getPolyCoords(df.geometry)
 
-    stateName = state[:1].upper() + state[1:]
-
-    maxDistricts = 4 
-    fips = 1
-    if stateName == 'Iowa':# TODO: hardcoded max districts for Iowa/Washingon
-        maxDistricts = 4
-        fips = 19
-    elif stateName == 'Washington':
-        maxDistricts = 7 
-        fips = 53
-    # fips = df.geoid[0][:2] #TODO
-
     precincts = []
     for index, prec in df.iterrows():
-        precName = prec.name
+        precName = prec['name']
         precID = index
+
         vertices = []
-        for v in coordLists[index]:
-            coord = {
-                "lat": float(v[0]),
-                "lng": float(v[1])
-            }
-            vertices.append(coord)
+        if includeV:
+            for v in coordLists[index]:
+                coord = {
+                    "lat": float(v[0]),
+                    "lng": float(v[1])
+                }
+                vertices.append(coord)
         districtID = 0 #TODO: Hard coded 0 for missing district IDs
 
         precinctEntry = {
@@ -270,14 +264,18 @@ def toJSON(df, state: str, stCode: str):
         precincts.append(precinctEntry)
 
     dictionary = {
-        "state": stateName,
+        "state": stCode,
         "maxDistricts": maxDistricts,
         "fips": fips,
         "precincts": precincts
     }
 
-    with open(OUTPUT_JSON_LOCATION.format(state=state), "w") as outfile:
-        outfile.write(json.dumps(dictionary, indent = 4))
+    json_loc = OUTPUT_JSON_LOCATION.format(state=state)
+    if not includeV:
+        json_loc = json_loc[:-5]+'.novert.json'
+
+    with open(json_loc, "w") as outfile:
+        return outfile.write(json.dumps(dictionary, indent = 4))
         
     
 def main(arg):
@@ -287,6 +285,8 @@ def main(arg):
     # Get state
     logging.debug(f"Parsing state")
     state = parseState()
+    # Get metadata
+    stCode, numDistricts, fips= getStateMeta(state)
     logging.debug(f"Retrieved state {state}")
 
     # Load in merged data
@@ -297,21 +297,23 @@ def main(arg):
     #initialize output directory
     initializeOutput(state)
 
-    # Get state code, ex: 'WA' for Washington
-    stCode = getStateCode(state)
-    import pdb; pdb.set_trace()
-
     # Output to .idx file
     if(arg == None or arg == '-idx'):
         logging.debug(f"Writing to " + OUTPUT_IDX_LOCATION.format(state=state))
-        written = toIdx(df, state, stCode)
-        logging.debug(f"Finished writing {written} bytes to .idx file")
+        written = toIdx(df, state, stCode, numDistricts)
+        logging.debug(f"Finished writing {written} bytes to {state}.idx")
 
     # Output to .JSON file
     if (arg == None or arg == '-json'):
         logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state))
-        toJSON(df, state, stCode)
-        logging.debug(f"Finished writing to .JSON file")
+        written = toJSON(df, state, stCode, numDistricts, fips)
+        logging.debug(f"Finished writing {written} bytes to {state}.json")
+
+    if (arg == None or arg == '-jnovert'):
+        # Chang where to write to
+        logging.debug(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.novert.json')
+        written = toJSON(df, state, stCode, numDistricts, fips, False)
+        logging.debug(f"Finished writing {written} bytes to {state}.novert.json")
 
     logging.debug(f"Finished writing output in {getTimeDiff(startTime)} seconds\n\n\n")
 
