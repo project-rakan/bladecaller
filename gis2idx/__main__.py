@@ -64,9 +64,10 @@ def processState(state: str, args):
     for arg in args:
         if arg.startswith('-') and arg != '-use_cache':
             outputArgs.append(arg)
-
-    logging.info(f"Running merged2output({str(outputArgs)[1:-1]})")
-    merged2output.main(outputArgs)
+            
+    if '-parse' not in args:
+        logging.info(f"Running merged2output({str(outputArgs)[1:-1]})")
+        merged2output.main(outputArgs)
     
 def sanityChecks(state: str):
     if not os.path.isdir(VTD_LOCATION.format(state=state)):
