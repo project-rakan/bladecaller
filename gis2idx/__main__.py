@@ -37,7 +37,8 @@ from merged2output import (
 )
 
 # This is the default set of states that the method will run on
-# For dev purposes only, TODO: remove this list
+# For dev purposes only, 
+# TODO: remove this list
 WORKING = ['iowa', 'washington']
 
 def processState(state: str, args):
@@ -64,7 +65,7 @@ def processState(state: str, args):
     for arg in args:
         if arg.startswith('-') and arg != '-use_cache':
             outputArgs.append(arg)
-            
+
     if '-parse' not in args:
         logging.info(f"Running merged2output({str(outputArgs)[1:-1]})")
         merged2output.main(outputArgs)
@@ -132,6 +133,7 @@ def main():
         sanityChecks(state)
 
         # Then perform processing
+        # TODO: remove this check
         if state in WORKING:
             processState(state, args)
 
