@@ -39,7 +39,7 @@ from util import (
 )
 MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
 
-ARGUMENTS = set(['-idx', '-json', '-novert', '-readable'])
+ARGUMENTS = set(['-idx', '-json', '-novert', '-readable', '-districts'])
 
 # .idx data formats
 """
@@ -326,13 +326,10 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=T
                 }
                 vertices.append(coord)
 
-        districtID = prec['district']
-
         precinctEntry = {
             "name": precName,
             "id": precID,
             "vertices": vertices,
-            "district": districtID
         }
         precincts.append(precinctEntry)
 
@@ -365,6 +362,21 @@ def checkArgs(args) :
     if len(clean) == 0:
         return None
     return set(clean) 
+
+def toJSONDict(df, state, stCode):
+    mapping = []
+    for index, prec in df.iterrows():
+        mapping.append(
+            {"Precinct:": int(index), "District": prec['district']}
+        )
+    output = {
+        "state": stCode,
+        "map": mapping
+    }
+    districtsLoc = OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.districts.json'
+    with open(districtsLoc, "w") as outfile:
+        return outfile.write(json.dumps(output, indent = 4))
+
 
     
         
@@ -413,6 +425,11 @@ def main(args):
         logging.info(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.novert.json')
         written = toJSON(df, state, stCode, numDistricts, fips, False)
         logging.info(f"Finished writing {written} bytes to {state}.novert.json")
+
+    if (args == None or '-districts' in args or '-all in args'):
+        logging.info(f"Writing to " + OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.districts.json')
+        written = toJSONDict(df, state, stCode)
+        logging.info(f"Finished writing {written} bytes to {state}.districts.json")
 
     logging.info(f"Finished writing {state} output in {getTimeDiff(startTime)} seconds\n\n")
 
