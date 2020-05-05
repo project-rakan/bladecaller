@@ -214,8 +214,7 @@ def toIdx(df, state: str, stCode: str, numDistricts: int, readable=False):
         node = [nodeID] + [area] + neighborsPacked + [demoPacked]
         nodes.append(node)
 
-        # recalculate nodePos for next record
-        nodePos = nodePos + calcNodeSize(numNeighbors)
+        
 
         if (readable):
             readableRecs.append((int(index), numNeighbors, nodePos))
@@ -223,6 +222,9 @@ def toIdx(df, state: str, stCode: str, numDistricts: int, readable=False):
                                 precinct.land + precinct.water,
                                 neighborsLists[index],
                                 readableDemo))
+
+        # recalculate nodePos for next record
+        nodePos = nodePos + calcNodeSize(numNeighbors)
 
         #END OF FORLOOP
 
