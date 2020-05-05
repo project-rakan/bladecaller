@@ -25,3 +25,27 @@ Removes all water from the `csv` file.
     - file of demographic information (`.csv` file)
 - Prdouces:
     - A `networkx` pickle (`.nxb` file)
+
+
+Usage: py gis2idx [state] [options]
+
+If no state is given
+    - the pipeline will run for every state that has its own file under 'data/'
+
+If no options are given:
+    - The pipeline will run the stateparser on the given state(s)
+    - The pipeline will run merged2output without any additional options
+        -This will create the .idx, .json, .novert.json, .districts.json files
+
+Parser options:
+    - '-use_cache' will skip the state parsing step for states that have cached artifacts whenever possible
+    - '-parse' will only run the stateparser step of the pipeline, caching the results
+
+Output options: 
+    (can take multiple arguments, will only produce the output defined by the arguments given)
+    - '-idx'        create the .idx file
+    - '-json'       create the .json file
+    - '-novert'     create the .novert.json file
+    - '-readable'   create the .idx.json and .idx files
+    - '-districts'  create the .districts.json
+    - '-all'        create all 5 file types
