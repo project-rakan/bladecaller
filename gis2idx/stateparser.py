@@ -126,8 +126,10 @@ class State(object):
         pass
 
     def dropWater(self):
-        "Drop all rows where land area = 0"
-        self._demographic_df = self._demographic_df[self._demographic_df['land'] != 0].reset_index(drop=True)
+        "Drop all rows where it's a river"
+        self._demographic_df = self._demographic_df[~(
+            (self._demographic_df['name'].str.contains('River')) & (self._demographic_df['land'] == 0)
+        )].reset_index(drop=True)
 
     def dropMultiPolygons(self):
         "Drop the multi polygons"
@@ -219,5 +221,5 @@ def main(state):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='stateparser.log', level=logging.info)
+    logging.basicConfig(filename='stateparser.log', level=logging.INFO)
     main(parseState())
