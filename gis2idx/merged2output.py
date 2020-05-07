@@ -39,7 +39,7 @@ from util import (
 )
 MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
 
-ARGUMENTS = set(['-idx', '-json', '-novert', '-readable', '-districts'])
+ARGUMENTS = set(['-idx', '-json', '-novert', '-readable', '-districts', '-shp'])
 
 # .idx data formats
 """
@@ -380,7 +380,9 @@ def toJSONDict(df, state, stCode):
         return outfile.write(json.dumps(output, indent = 4))
 
 
-    
+def toSHP(df):
+    import pdb; pdb.set_trace()
+    df.to_file('test.shp')
         
     
 def main(args):
@@ -406,6 +408,10 @@ def main(args):
 
     #initialize output directory
     initializeOutput(state)
+
+    # Output to .shp file
+    if (args != None and ('-shp')):
+        toSHP(df)
 
     # Output to .idx file
     if (args != None and ('-all' in args or '-readable' in args)):
@@ -437,7 +443,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    import pdb; pdb.set_trace()
-    logging.basicConfig(filename='merged2output.log', level=logging.info, filemode=LOGMODE)
+    logging.basicConfig(filename='merged2output.log', level=logging.INFO, filemode=LOGMODE)
     main(sys.argv[1:] if len(sys.argv) >= 2 else None)
 
