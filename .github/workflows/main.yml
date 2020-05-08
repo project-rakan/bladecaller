@@ -1,0 +1,10 @@
+on: [push]
+
+jobs:
+  hello_world_job:
+    runs-on: ubuntu-latest
+    name: Docker Tests
+    steps:
+    - name: Running Docker Tests
+      uses: project-rakan/bladecaller@master
+
