@@ -145,6 +145,8 @@ class State(object):
             self._demographic_df = self._demographic_df.groupby('countyfp').agg(sum)
             self._demographic_df['geometry'] = geometries['geometry']
             self._demographic_df = self._demographic_df.reset_index()
+            self._demographic_df['name'] = 'county '
+            self._demographic_df['name'] += self._demographic_df['countyfp']
             self.dropMultiPolygons()
         elif level is not None:
             raise ValueError("Unknown level")
@@ -179,7 +181,8 @@ class State(object):
         for column in [
             'center_y', 'center_x', 'vtdi', 'vtd', 'geoid_x', 'GEOID', 'geoid_y'
         ]:
-            del self._demographic_df[column]
+            if column in self._demographic_df.columns:
+                del self._demographic_df[column]
         
         self.save()
 
