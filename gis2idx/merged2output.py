@@ -323,8 +323,8 @@ def toJSON(df, state: str, stCode: str, maxDistricts: int, fips: int, includeV=T
         if includeV:
             for v in coordLists[index]:
                 coord = {
-                    "lat": float(v[0]),
-                    "lng": float(v[1])
+                    "lat": float(v[1]),
+                    "lng": float(v[0])
                 }
                 vertices.append(coord)
 
