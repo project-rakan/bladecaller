@@ -31,4 +31,4 @@ WORKDIR /home/project
 RUN ln -fs /usr/share/zoneinfo/America/Los_Angles /etc/localtime
 
 # For when the app actually works
-# ENTRYPOINT [ "bash ./docker-entrypoint.sh && bash" ] 
+ENTRYPOINT [ "/bin/bash", "./docker-entrypoint.sh" ] 
