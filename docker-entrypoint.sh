@@ -6,3 +6,4 @@ su - postgres -c "psql -c \"CREATE USER norton with encrypted password 'Norton00
 su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE merge_table TO norton;\""
 su - postgres -c "psql -c \"ALTER USER norton WITH SUPERUSER;\""
 cd gis2idx/datamerger && python3.7 manage.py migrate && cd ../../
+python3.7 gis2idx $@
