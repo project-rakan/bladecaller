@@ -27,6 +27,8 @@ RUN python3.7 -m pip install -r /app/requirements.txt
 
 WORKDIR /home/project
 
+COPY . .
+
 # Install database components
 RUN ln -fs /usr/share/zoneinfo/America/Los_Angles /etc/localtime
 
