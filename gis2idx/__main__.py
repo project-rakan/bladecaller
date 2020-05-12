@@ -39,7 +39,7 @@ from merged2output import (
 # This is the default set of states that the method will run on
 # For dev purposes only, 
 # TODO: remove this list
-WORKING = ['iowa', 'washington']
+WORKING = ['iowa']
 
 def processState(state: str, args):
     """
