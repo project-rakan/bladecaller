@@ -370,12 +370,13 @@ def checkArgs(args) :
 def toJSONDict(df, state, stCode):
     mapping = []
     for index, prec in df.iterrows():
-        mapping.append(
-            {"Precinct:": int(index), "District": prec['district']}
-        )
+        # mapping.append(
+        #     {"Precinct:": int(index), "District": prec['district']}
+        # )
+        mapping.append((int(index),prec['district']))
     output = {
         "state": stCode,
-        "map": mapping
+        "map": dict(mapping)
     }
     districtsLoc = OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.districts.json'
     with open(districtsLoc, "w") as outfile:
