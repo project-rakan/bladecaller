@@ -146,10 +146,10 @@ class State(object):
             geometries = gpd.GeoDataFrame(self._demographic_df).dissolve('countyfp')
             self._demographic_df = self._demographic_df.groupby('countyfp').agg(sum)
             self._demographic_df['geometry'] = geometries['geometry']
+            self._demographic_df.district = geometries.district
             self._demographic_df = self._demographic_df.reset_index()
             self._demographic_df['name'] = 'county '
             self._demographic_df['name'] += self._demographic_df['countyfp']
-            self.dropMultiPolygons()
         elif level is not None:
             raise ValueError("Unknown level")
 
