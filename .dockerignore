@@ -1,0 +1,6 @@
+data/
+.env/
+.gis2idx_cache/
+.mypy_cache/
+.vscode/
+output/
