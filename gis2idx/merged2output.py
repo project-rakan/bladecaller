@@ -15,6 +15,7 @@ import io
 import json
 import struct
 import pandas as pd
+import geopandas
 import logging
 import os
 import sys
@@ -38,6 +39,7 @@ from util import (
     parseState
 )
 MERGED_DF_INPUT = STATEPARSER_CACHE_LOCATION + '{state}.state.pk'
+SHP_OUTPUT = OUTPUT_PREFIX + '{state}/shp/'
 
 ARGUMENTS = set(['-idx', '-json', '-novert', '-readable', '-districts', '-shp'])
 
@@ -380,9 +382,13 @@ def toJSONDict(df, state, stCode):
         return outfile.write(json.dumps(output, indent = 4))
 
 
-def toSHP(df):
-    import pdb; pdb.set_trace()
-    df.to_file('test.shp')
+def toSHP(df, state):
+    shpDir = SHP_OUTPUT.format(state=state)
+    if not os.path.isdir(shpDir):
+        logging.info(f"Creating {shpDir}")
+        os.mkdir(shpDir)
+    geodf = geopandas.GeoDataFrame(df, geometry='geometry')
+    geodf.to_file((SHP_OUTPUT + '{state}.shp').format(state=state))
         
     
 def main(args):
@@ -410,8 +416,8 @@ def main(args):
     initializeOutput(state)
 
     # Output to .shp file
-    if (args != None and ('-shp')):
-        toSHP(df)
+    if (args != None and ('-shp' in args or '-all' in args)):
+        toSHP(df, state)
 
     # Output to .idx file
     if (args != None and ('-all' in args or '-readable' in args)):
