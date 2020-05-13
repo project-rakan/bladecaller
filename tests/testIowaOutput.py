@@ -20,7 +20,7 @@ with open('tests/expected/iowaExpected.json') as f:
 
 class testCreateOutput(unittest.TestCase):
     def testGis2Idx(self):
-        self.assertEqual(os.system(f'python3.7 gis2idx iowa -readable -idx -json -districts -novert'), 0)
+        self.assertEqual(os.system(f'python3.7 gis2idx iowa -all'), 0)
 
 class testIDXOutput(unittest.TestCase):
     def testReadableIdx(self):
@@ -78,14 +78,15 @@ class testJSONOutput(unittest.TestCase):
         with open(location) as f:
             actual = json.load(f)
         
+        with open(location) as f:
+            expected = json.load(f)
+
         self.assertEqual(actual["state"], expStCode)
         actMap = actual["map"]
-        self.assertEqual(type(actMap), type(dict([])))
         self.assertEqual(len(actMap), expNumNodes)
-        self.assertEqual(set(actMap.values()), set(range(expNumDistricts + 1)[1:]))
+        self.assertEqual(set([v[1] for v in actMap]), set(range(expNumDistricts + 1)[1:]))
 
-        for i in range(expNumNodes):
-            self.assertTrue(actMap.__contains__(str(i)))
+        self.assertEqual(actual, expected)
 
 
 if __name__ == '__main__':
