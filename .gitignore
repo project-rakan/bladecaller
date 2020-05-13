@@ -3,3 +3,4 @@
 .vscode/
 *.log
 *_cache/
+output/*/shp/
