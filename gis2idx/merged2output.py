@@ -373,10 +373,10 @@ def toJSONDict(df, state, stCode):
         # mapping.append(
         #     {"Precinct:": int(index), "District": prec['district']}
         # )
-        mapping.append((int(index),prec['district']))
+        mapping.append([int(index), prec['district']])
     output = {
         "state": stCode,
-        "map": dict(mapping)
+        "map": mapping
     }
     districtsLoc = OUTPUT_JSON_LOCATION.format(state=state)[:-5]+'.districts.json'
     with open(districtsLoc, "w") as outfile:
