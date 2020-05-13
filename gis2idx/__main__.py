@@ -126,15 +126,15 @@ def main():
     for state in stateList:
         if '.' in state or '_' in state:
             continue
-
-        logging.info(f"Found state {state}")
-
-        # Sanity Checks for input data
-        sanityChecks(state)
-
-        # Then perform processing
+        
         # TODO: remove this check
         if state in WORKING:
+            logging.info(f"Found state {state}")
+
+            # Sanity Checks for input data
+            sanityChecks(state)
+
+            # Then perform processing
             processState(state, args)
 
 if __name__ == "__main__":
@@ -146,4 +146,6 @@ if __name__ == "__main__":
             sys.exit()
 
     logging.basicConfig(filename='gis2idx.log',level=logging.INFO,filemode='w')
+    #output log to console as well as file
+    logging.getLogger().addHandler(logging.StreamHandler())
     main()
