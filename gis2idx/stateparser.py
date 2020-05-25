@@ -2,6 +2,7 @@ import io
 import os
 import logging
 import sys
+import csv
 import geopandas as gpd
 import pandas as pd
 
@@ -13,6 +14,7 @@ from util import (
     INPUT_PREFIX,
     CACHE_LOCATION,
     STATEPARSER_CACHE_LOCATION,
+    STATEGRANULARITY_LOCATION,
     parseState
 )
 
@@ -144,15 +146,15 @@ class State(object):
             geometries = gpd.GeoDataFrame(self._demographic_df).dissolve('countyfp')
             self._demographic_df = self._demographic_df.groupby('countyfp').agg(sum)
             self._demographic_df['geometry'] = geometries['geometry']
+            self._demographic_df.district = geometries.district
             self._demographic_df = self._demographic_df.reset_index()
             self._demographic_df['name'] = 'county '
             self._demographic_df['name'] += self._demographic_df['countyfp']
-            self.dropMultiPolygons()
         elif level is not None:
             raise ValueError("Unknown level")
 
 
-    def mergeTables(self, dissolvePattern: str = None):
+    def mergeTables(self, state):
         "Use PostGIS to merge all datasets into one df"
         # merge demographics + tracts
         self.save()
@@ -176,7 +178,12 @@ class State(object):
         # Drop multi-polygons here
         self.dropWater()
         self.dropMultiPolygons()
-        self.dissolveGranularity(dissolvePattern)
+        
+        # Check if we need to dissolve the granularity
+        stateKeys = csv.reader(open(STATEGRANULARITY_LOCATION))
+        for row in stateKeys:
+            if state == row[0]:
+                self.dissolveGranularity(row[1]) #row[1] = dissolvePattern
 
         for column in [
             'center_y', 'center_x', 'vtdi', 'vtd', 'geoid_x', 'GEOID', 'geoid_y'
@@ -220,7 +227,7 @@ def main(state):
     stateHandle.loadTracts()
     stateHandle.loadDemographics()
     stateHandle.loadVotes()
-    stateHandle.mergeTables(sys.argv[2] if len(sys.argv) >= 3 else None)
+    stateHandle.mergeTables(state)
 
 
 if __name__ == "__main__":

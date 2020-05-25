@@ -60,22 +60,33 @@ class Command(BaseCommand):
         ))
 
         # Merge the Iterate through all districts and get a list of overlapping precincts for each one.
-        
+
+        tabledict = {}
+
+        # Leverage PostGIS to generate the intersection
+        for district in DistrictBlock.objects.all():
+            related_tracts = VTDBlock.objects.filter(geometry__bboverlaps=district.geometry) # The magical fast function
+
+            for vtd in related_tracts: #VTDBlock.objects.all():
+                intersect = vtd.geometry.intersection(district.geometry).area
+                
+                if tabledict.__contains__(vtd.geoid):
+                    if intersect > tabledict[vtd.geoid][1]:
+                        tabledict[vtd.geoid] = (district.district_id, intersect)
+                else:
+                    tabledict[vtd.geoid] = (district.district_id, intersect)
 
         table = {
             'geoid': [],
             'district': []
         }
 
-        # Leverage PostGIS to generate the intersection
-        for district in DistrictBlock.objects.all():
-            related_tracts = VTDBlock.objects.filter(geometry__bboverlaps=district.geometry) # The magical fast function
+        for key in tabledict.keys():
+            entry = tabledict[key][0]
+            table['geoid'].append(key)
+            table['district'].append(entry)
 
-            for vtd in related_tracts:
-                table['geoid'].append(vtd.geoid)
-                table['district'].append(district.district_id)
-
-        output_df = pd.DataFrame(data=table).drop_duplicates(subset=['geoid'], keep='first').reset_index(drop=True)
+        output_df = pd.DataFrame(data=table).drop_duplicates(subset=['geoid'], keep='last').reset_index(drop=True)
 
         with io.open(output, 'wb') as handle:
             pickle.dump(output_df, handle)    

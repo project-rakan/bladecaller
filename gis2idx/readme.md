@@ -48,4 +48,5 @@ Output options:
     - '-novert'     create the .novert.json file
     - '-readable'   create the .idx.json and .idx files
     - '-districts'  create the .districts.json
-    - '-all'        create all 5 file types
+    - '-shp'        create the shp directory and .shp file to visualize the map
+    - '-all'        create all 6 file types
